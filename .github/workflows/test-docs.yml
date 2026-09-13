@@ -8,9 +8,15 @@ on:
       - 'website/**'
       - '.github/workflows/test-docs.yml'
 
+permissions:
+  contents: read
+
 jobs:
   test-build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [22, 24]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -18,13 +24,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node }}
           cache: npm
           cache-dependency-path: website/package-lock.json
 
       - name: Install dependencies
         working-directory: website
         run: npm ci
+
+      - name: Dependency security contracts
+        working-directory: website
+        run: npm run test:security
 
       - name: Build website
         working-directory: website

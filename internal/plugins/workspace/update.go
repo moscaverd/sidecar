@@ -2,15 +2,16 @@ package workspace
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+
 	app "github.com/marcus/sidecar/internal/app"
 	"github.com/marcus/sidecar/internal/plugin"
 	"github.com/marcus/sidecar/internal/plugins/gitstatus"
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 // Update handles messages.
@@ -233,7 +234,7 @@ func (p *Plugin) Update(msg tea.Msg) (plugin.Plugin, tea.Cmd) {
 
 	case PromptInstallDefaultsMsg:
 		// User pressed 'd' to install default prompts
-		home, err := os.UserHomeDir()
+		home, err := userhome.Dir()
 		if err != nil {
 			return p, func() tea.Msg {
 				return app.ToastMsg{Message: "Cannot determine home directory", Duration: 3 * time.Second, IsError: true}

@@ -281,7 +281,7 @@ Set `"nerdFontsEnabled": true` if you have a [Nerd Font](https://www.nerdfonts.c
 
 Popular Nerd Fonts: JetBrains Mono, FiraCode, Hack, Meslo. Without a Nerd Font, leave this `false` or the glyphs will render as boxes.
 
-**Plugin-specific config:** Workspace prompts support project-level overrides via `.sidecar/config.json`. See [Workspaces documentation](./workspaces-plugin#custom-prompts) for details.
+**Plugin-specific config:** Workspace prompts support project-level overrides via `.sidecar/config.json`. See [Workspaces documentation](./workspaces-plugin#reusable-prompts) for details.
 
 ## Command-Line Options
 

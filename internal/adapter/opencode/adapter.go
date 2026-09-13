@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 const (
@@ -41,7 +42,7 @@ type sessionMetaCacheEntry struct {
 
 // New creates a new OpenCode adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, _ := userhome.Dir()
 	storageDir := findOpenCodeStorageDir(home)
 	return &Adapter{
 		storageDir:   storageDir,
@@ -77,13 +78,13 @@ func openCodeStorageCandidates(home string) []string {
 		// Platform-native (post-PR #8236)
 		candidates = append(candidates, filepath.Join(home, "Library", "Application Support", "opencode", "storage"))
 	case "linux":
-		xdgData := os.Getenv("XDG_DATA_HOME")
+		xdgData := userhome.Getenv("XDG_DATA_HOME")
 		if xdgData == "" {
 			xdgData = filepath.Join(home, ".local", "share")
 		}
 		candidates = append(candidates, filepath.Join(xdgData, "opencode", "storage"))
 	case "windows":
-		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+		if localAppData := userhome.Getenv("LOCALAPPDATA"); localAppData != "" {
 			candidates = append(candidates, filepath.Join(localAppData, "opencode", "Data", "storage"))
 		}
 	}

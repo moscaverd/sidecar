@@ -10,14 +10,16 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/marcus/sidecar/internal/app"
+	"github.com/marcus/sidecar/internal/hostexec"
 )
 
 // fetchPRList runs gh pr list and returns open PRs.
 func (p *Plugin) fetchPRList() tea.Cmd {
 	workDir := p.ctx.WorkDir
 	return func() tea.Msg {
-		cmd := exec.Command("gh", "pr", "list",
+		cmd := hostexec.Command("gh", "pr", "list",
 			"--json", "number,title,headRefName,url,isDraft,createdAt,author",
 			"--limit", "30",
 		)

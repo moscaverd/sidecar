@@ -12,7 +12,9 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/marcus/sidecar/internal/app"
+	"github.com/marcus/sidecar/internal/hostexec"
 	"github.com/marcus/sidecar/internal/palette"
 	"github.com/marcus/sidecar/internal/tdroot"
 )
@@ -299,7 +301,7 @@ func (p *Plugin) doCreateWorktree(name, baseBranch, taskID, taskTitle string, ag
 		}
 
 		// Auto-start the task in td (if td is available)
-		startCmd := exec.Command("td", "start", taskID)
+		startCmd := hostexec.Command("td", "start", taskID)
 		startCmd.Dir = wtPath
 		if err := startCmd.Run(); err != nil {
 			p.ctx.Logger.Warn("failed to start td task", "task", taskID, "error", err)
@@ -634,7 +636,7 @@ func loadPRURL(worktreePath string) string {
 func (p *Plugin) linkTask(wt *Worktree, taskID string) tea.Cmd {
 	return func() tea.Msg {
 		// Validate task exists by running td show
-		cmd := exec.Command("td", "show", taskID)
+		cmd := hostexec.Command("td", "show", taskID)
 		cmd.Dir = p.ctx.WorkDir
 		if err := cmd.Run(); err != nil {
 			return TaskLinkedMsg{
@@ -682,7 +684,7 @@ func (p *Plugin) loadOpenTasks() tea.Cmd {
 	return func() tea.Msg {
 		// Use --limit 500 to fetch more items (td defaults to 50)
 		// Include all statuses except closed so users can link tasks in_review, etc.
-		cmd := exec.Command("td", "list", "--json", "--status", "open,in_progress,in_review", "--limit", "500")
+		cmd := hostexec.Command("td", "list", "--json", "--status", "open,in_progress,in_review", "--limit", "500")
 		cmd.Dir = p.ctx.WorkDir
 		output, err := cmd.Output()
 		if err != nil {
@@ -926,7 +928,7 @@ func SanitizeBranchName(name string) string {
 // loadTaskDetails fetches full task details from td.
 func (p *Plugin) loadTaskDetails(taskID string) tea.Cmd {
 	return func() tea.Msg {
-		cmd := exec.Command("td", "show", taskID, "--json")
+		cmd := hostexec.Command("td", "show", taskID, "--json")
 		cmd.Dir = p.ctx.WorkDir
 		output, err := cmd.Output()
 		if err != nil {

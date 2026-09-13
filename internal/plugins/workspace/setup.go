@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/marcus/sidecar/internal/hostexec"
 )
 
 // Default setup configuration
@@ -32,18 +33,18 @@ var (
 
 // SetupConfig holds worktree setup configuration.
 type SetupConfig struct {
-	CopyEnv       bool     // Whether to copy env files (default: true)
-	EnvFiles      []string // List of env files to copy
-	SymlinkDirs   []string // Directories to symlink (default: empty, opt-in)
-	RunSetupScript bool    // Whether to run .worktree-setup.sh (default: true)
+	CopyEnv        bool     // Whether to copy env files (default: true)
+	EnvFiles       []string // List of env files to copy
+	SymlinkDirs    []string // Directories to symlink (default: empty, opt-in)
+	RunSetupScript bool     // Whether to run .worktree-setup.sh (default: true)
 }
 
 // DefaultSetupConfig returns the default setup configuration.
 func DefaultSetupConfig() *SetupConfig {
 	return &SetupConfig{
-		CopyEnv:       true,
-		EnvFiles:      defaultEnvFiles,
-		SymlinkDirs:   nil, // Opt-in, not enabled by default
+		CopyEnv:        true,
+		EnvFiles:       defaultEnvFiles,
+		SymlinkDirs:    nil, // Opt-in, not enabled by default
 		RunSetupScript: true,
 	}
 }
@@ -196,7 +197,7 @@ func (p *Plugin) runSetupScript(worktreePath, branchName string) error {
 	}
 
 	// Run the script with the worktree as working directory
-	cmd := exec.Command("bash", scriptPath)
+	cmd := hostexec.Command("bash", scriptPath)
 	cmd.Dir = worktreePath
 
 	// Build isolated environment with overrides applied

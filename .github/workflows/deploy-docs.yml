@@ -10,8 +10,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: "pages"
@@ -27,7 +25,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: website/package-lock.json
 
@@ -35,24 +33,42 @@ jobs:
         working-directory: website
         run: npm ci
 
+      - name: Dependency security contracts
+        working-directory: website
+        run: npm run test:security
+
       - name: Build website
         working-directory: website
         run: npm run build
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: website/build
 
+  setup-pages:
+    if: github.repository == 'marcus/sidecar'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
   deploy:
+    if: github.repository == 'marcus/sidecar'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build, setup-pages]
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

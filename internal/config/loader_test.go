@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 func TestDefault(t *testing.T) {
@@ -80,7 +82,7 @@ func TestLoadFrom_InvalidJSON(t *testing.T) {
 }
 
 func TestExpandPath(t *testing.T) {
-	home, _ := os.UserHomeDir()
+	home, _ := userhome.Dir()
 
 	tests := []struct {
 		input  string
@@ -154,7 +156,7 @@ func TestLoadFrom_ProjectsList(t *testing.T) {
 	}
 
 	// Check tilde expansion
-	home, _ := os.UserHomeDir()
+	home, _ := userhome.Dir()
 	expectedPath := filepath.Join(home, "code/test")
 	if cfg.Projects.List[1].Path != expectedPath {
 		t.Errorf("got path %q, want %q (tilde expanded)", cfg.Projects.List[1].Path, expectedPath)

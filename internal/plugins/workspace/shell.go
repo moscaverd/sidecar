@@ -3,7 +3,6 @@ package workspace
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -13,8 +12,11 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/marcus/sidecar/internal/features"
+	"github.com/marcus/sidecar/internal/hostexec"
 	"github.com/marcus/sidecar/internal/state"
+	"github.com/marcus/sidecar/internal/tmuxcmd"
 	"github.com/marcus/sidecar/internal/tty"
 )
 
@@ -42,7 +44,7 @@ var (
 // Result is cached after first check.
 func isTmuxInstalled() bool {
 	tmuxInstalledOnce.Do(func() {
-		_, err := exec.LookPath("tmux")
+		_, err := hostexec.LookPath("tmux")
 		tmuxInstalledCached = err == nil
 	})
 	return tmuxInstalledCached
@@ -59,7 +61,7 @@ func getTmuxPrefix() string {
 			return
 		}
 
-		out, err := exec.Command("tmux", "show-options", "-g", "prefix").Output()
+		out, err := tmuxcmd.Command("show-options", "-g", "prefix").Output()
 		if err != nil {
 			return
 		}
@@ -314,7 +316,7 @@ func (p *Plugin) discoverTmuxSessionNames() []string {
 	projectName := filepath.Base(p.ctx.WorkDir)
 	basePrefix := shellSessionPrefix + sanitizeName(projectName)
 
-	cmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}")
+	cmd := tmuxcmd.Command("list-sessions", "-F", "#{session_name}")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil
@@ -462,6 +464,7 @@ func (p *Plugin) restoreShellDisplayNames() {
 		_ = state.SetWorkspaceState(p.ctx.ProjectRoot, wtState)
 	}
 }
+
 // nextShellIndex returns the next available shell index based on existing sessions.
 func (p *Plugin) nextShellIndex() int {
 	projectName := filepath.Base(p.ctx.WorkDir)
@@ -529,7 +532,7 @@ func (p *Plugin) createNewShell(customName string) tea.Cmd {
 			"-s", sessionName, // Session name
 			"-c", workDir, // Working directory
 		}
-		cmd := exec.Command("tmux", args...)
+		cmd := tmuxcmd.Command(args...)
 		if err := cmd.Run(); err != nil {
 			return ShellCreatedMsg{
 				SessionName: sessionName,
@@ -587,7 +590,7 @@ func (p *Plugin) createShellWithAgent() tea.Cmd {
 			"-s", sessionName, // Session name
 			"-c", workDir, // Working directory
 		}
-		cmd := exec.Command("tmux", args...)
+		cmd := tmuxcmd.Command(args...)
 		if err := cmd.Run(); err != nil {
 			return ShellCreatedMsg{
 				SessionName: sessionName,
@@ -631,7 +634,7 @@ func (p *Plugin) recreateOrphanedShell(idx int) tea.Cmd {
 		if previewWidth > 0 && previewHeight > 0 {
 			args = append(args, "-x", strconv.Itoa(previewWidth), "-y", strconv.Itoa(previewHeight))
 		}
-		cmd := exec.Command("tmux", args...)
+		cmd := tmuxcmd.Command(args...)
 		if err := cmd.Run(); err != nil {
 			return ShellCreatedMsg{
 				SessionName: sessionName,
@@ -676,7 +679,7 @@ func (p *Plugin) startAgentInShell(tmuxName string, agentType AgentType, skipPer
 		}
 
 		// Send the command to the shell's tmux session
-		cmd := exec.Command("tmux", "send-keys", "-t", tmuxName, baseCmd, "Enter")
+		cmd := tmuxcmd.Command("send-keys", "-t", tmuxName, baseCmd, "Enter")
 		if err := cmd.Run(); err != nil {
 			return ShellAgentErrorMsg{
 				TmuxName: tmuxName,
@@ -738,7 +741,7 @@ func (p *Plugin) ensureShellAndAttachByIndex(idx int) tea.Cmd {
 			if previewWidth > 0 && previewHeight > 0 {
 				args = append(args, "-x", strconv.Itoa(previewWidth), "-y", strconv.Itoa(previewHeight))
 			}
-			cmd := exec.Command("tmux", args...)
+			cmd := tmuxcmd.Command(args...)
 			if err := cmd.Run(); err != nil {
 				return ShellCreatedMsg{
 					SessionName: sessionName,
@@ -791,7 +794,7 @@ func (p *Plugin) killShellSessionByName(sessionName string) tea.Cmd {
 
 	return func() tea.Msg {
 		// Kill the session
-		cmd := exec.Command("tmux", "kill-session", "-t", sessionName)
+		cmd := tmuxcmd.Command("kill-session", "-t", sessionName)
 		_ = cmd.Run() // Ignore errors (session may already be dead)
 
 		// Clean up pane cache
@@ -962,7 +965,7 @@ func (p *Plugin) sendResumeCommandToShell(tmuxSession string, resumeCmd string) 
 	return func() tea.Msg {
 		// Use tmux send-keys to type the command without pressing Enter
 		// This lets the user review before executing
-		cmd := exec.Command("tmux", "send-keys", "-t", tmuxSession, resumeCmd)
+		cmd := tmuxcmd.Command("send-keys", "-t", tmuxSession, resumeCmd)
 		if err := cmd.Run(); err != nil {
 			return shellResumeErrorMsg{Err: err}
 		}
@@ -1026,7 +1029,7 @@ func (p *Plugin) startAgentWithResumeCmd(wt *Worktree, agentType AgentType, skip
 		sessionName := tmuxSessionPrefix + sanitizeName(wt.Name)
 
 		// Check if session already exists
-		checkCmd := exec.Command("tmux", "has-session", "-t", sessionName)
+		checkCmd := tmuxcmd.Command("has-session", "-t", sessionName)
 		if checkCmd.Run() == nil {
 			// Session exists - should not happen for new resume worktree
 			paneID := getPaneID(sessionName)
@@ -1048,33 +1051,33 @@ func (p *Plugin) startAgentWithResumeCmd(wt *Worktree, agentType AgentType, skip
 			"-c", wt.Path, // Working directory
 		}
 
-		cmd := exec.Command("tmux", args...)
+		cmd := tmuxcmd.Command(args...)
 		if err := cmd.Run(); err != nil {
 			return AgentStartedMsg{Epoch: epoch, Err: fmt.Errorf("create session: %w", err)}
 		}
 
 		// Set history limit for scrollback capture
-		_ = exec.Command("tmux", "set-option", "-t", sessionName, "history-limit",
+		_ = tmuxcmd.Command("set-option", "-t", sessionName, "history-limit",
 			strconv.Itoa(tmuxHistoryLimit)).Run()
 
 		// Set TD_SESSION_ID environment variable for td session tracking
 		tdEnvCmd := fmt.Sprintf("export TD_SESSION_ID=%s", shellQuote(sessionName))
-		_ = exec.Command("tmux", "send-keys", "-t", sessionName, tdEnvCmd, "Enter").Run()
+		_ = tmuxcmd.Command("send-keys", "-t", sessionName, tdEnvCmd, "Enter").Run()
 
 		// Apply environment isolation
 		envOverrides := BuildEnvOverrides(p.ctx.WorkDir)
 		if envCmd := GenerateSingleEnvCommand(envOverrides); envCmd != "" {
-			_ = exec.Command("tmux", "send-keys", "-t", sessionName, envCmd, "Enter").Run()
+			_ = tmuxcmd.Command("send-keys", "-t", sessionName, envCmd, "Enter").Run()
 		}
 
 		// Small delay to ensure env is set
 		time.Sleep(100 * time.Millisecond)
 
 		// Send the resume command instead of the normal agent command
-		sendCmd := exec.Command("tmux", "send-keys", "-t", sessionName, resumeCmd, "Enter")
+		sendCmd := tmuxcmd.Command("send-keys", "-t", sessionName, resumeCmd, "Enter")
 		if err := sendCmd.Run(); err != nil {
 			// Try to kill the session if we failed to start the agent
-			_ = exec.Command("tmux", "kill-session", "-t", sessionName).Run()
+			_ = tmuxcmd.Command("kill-session", "-t", sessionName).Run()
 			return AgentStartedMsg{Epoch: epoch, Err: fmt.Errorf("start agent with resume: %w", err)}
 		}
 

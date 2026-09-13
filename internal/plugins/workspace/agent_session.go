@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 const (
@@ -135,7 +137,7 @@ func claudeProjectDirName(absPath string) string {
 //  2. Otherwise, fall back to JSONL content: last user entry → active (thinking),
 //     last assistant entry → waiting (idle)
 func detectClaudeSessionStatus(worktreePath string) (WorktreeStatus, bool) {
-	home, err := os.UserHomeDir()
+	home, err := userhome.Dir()
 	if err != nil {
 		return 0, false
 	}
@@ -194,7 +196,7 @@ func detectClaudeSessionStatus(worktreePath string) (WorktreeStatus, bool) {
 // Codex stores sessions in ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl with CWD field.
 // Codex has no sub-agents — all activity is recorded in one file per session.
 func detectCodexSessionStatus(worktreePath string) (WorktreeStatus, bool) {
-	home, err := os.UserHomeDir()
+	home, err := userhome.Dir()
 	if err != nil {
 		return 0, false
 	}
@@ -224,7 +226,7 @@ func detectCodexSessionStatus(worktreePath string) (WorktreeStatus, bool) {
 // detectGeminiSessionStatus checks Gemini CLI session files.
 // Gemini stores sessions in ~/.gemini/tmp/{sha256-hash}/chats/session-*.json
 func detectGeminiSessionStatus(worktreePath string) (WorktreeStatus, bool) {
-	home, err := os.UserHomeDir()
+	home, err := userhome.Dir()
 	if err != nil {
 		return 0, false
 	}
@@ -250,7 +252,7 @@ func detectGeminiSessionStatus(worktreePath string) (WorktreeStatus, bool) {
 // detectOpenCodeSessionStatus checks OpenCode session files.
 // OpenCode stores in ~/.local/share/opencode/storage/ with project/session/message dirs.
 func detectOpenCodeSessionStatus(worktreePath string) (WorktreeStatus, bool) {
-	home, err := os.UserHomeDir()
+	home, err := userhome.Dir()
 	if err != nil {
 		return 0, false
 	}
@@ -292,7 +294,7 @@ func detectCursorSessionStatus(worktreePath string) (WorktreeStatus, bool) {
 // Pi stores sessions in ~/.pi/agent/sessions/--{path-encoded}--/*.jsonl
 // Path encoding: /home/user/project → --home-user-project--
 func detectPiSessionStatus(worktreePath string) (WorktreeStatus, bool) {
-	home, err := os.UserHomeDir()
+	home, err := userhome.Dir()
 	if err != nil {
 		return 0, false
 	}
@@ -795,13 +797,13 @@ func findOpenCodeStorage(home string) string {
 	case "darwin":
 		candidates = append(candidates, filepath.Join(home, "Library", "Application Support", "opencode", "storage"))
 	case "linux":
-		xdgData := os.Getenv("XDG_DATA_HOME")
+		xdgData := userhome.Getenv("XDG_DATA_HOME")
 		if xdgData == "" {
 			xdgData = filepath.Join(home, ".local", "share")
 		}
 		candidates = append(candidates, filepath.Join(xdgData, "opencode", "storage"))
 	case "windows":
-		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+		if localAppData := userhome.Getenv("LOCALAPPDATA"); localAppData != "" {
 			candidates = append(candidates, filepath.Join(localAppData, "opencode", "Data", "storage"))
 		}
 	}
@@ -941,4 +943,3 @@ func getOpenCodeLastMessageStatus(storageDir, sessionID string) (WorktreeStatus,
 		return 0, false
 	}
 }
-

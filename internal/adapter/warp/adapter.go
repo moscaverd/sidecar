@@ -14,8 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/marcus/sidecar/internal/adapter"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 // ansiRegex matches ANSI escape codes
@@ -38,7 +40,7 @@ type Adapter struct {
 
 // New creates a new Warp adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, _ := userhome.Dir()
 	dbPath := findWarpDB(home)
 	return &Adapter{
 		dbPath:       dbPath,
@@ -72,13 +74,13 @@ func warpDBCandidates(home string) []string {
 			"Library", "Application Support", "dev.warp.Warp-Stable",
 			"warp.sqlite"))
 	case "linux":
-		stateHome := os.Getenv("XDG_STATE_HOME")
+		stateHome := userhome.Getenv("XDG_STATE_HOME")
 		if stateHome == "" {
 			stateHome = filepath.Join(home, ".local", "state")
 		}
 		candidates = append(candidates, filepath.Join(stateHome, "warp-terminal", "warp.sqlite"))
 	case "windows":
-		localAppData := os.Getenv("LOCALAPPDATA")
+		localAppData := userhome.Getenv("LOCALAPPDATA")
 		if localAppData != "" {
 			candidates = append(candidates, filepath.Join(localAppData, "warp", "Warp", "data", "warp.sqlite"))
 		}

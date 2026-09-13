@@ -3,15 +3,16 @@ package app
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/marcus/sidecar/internal/community"
 	"github.com/marcus/sidecar/internal/config"
+	"github.com/marcus/sidecar/internal/hostexec"
 	"github.com/marcus/sidecar/internal/keymap"
 	"github.com/marcus/sidecar/internal/modal"
 	"github.com/marcus/sidecar/internal/mouse"
@@ -101,21 +102,21 @@ type Model struct {
 	activeContext string
 
 	// UI state
-	width, height    int
-	showHelp         bool
-	helpModal        *modal.Modal
-	helpModalWidth   int
-	helpMouseHandler *mouse.Handler
+	width, height           int
+	showHelp                bool
+	helpModal               *modal.Modal
+	helpModalWidth          int
+	helpMouseHandler        *mouse.Handler
 	showDiagnostics         bool
 	diagnosticsModal        *modal.Modal
 	diagnosticsModalWidth   int
 	diagnosticsMouseHandler *mouse.Handler
 	showClock               bool
-	showPalette      bool
-	showQuitConfirm  bool
-	quitModal        *modal.Modal
-	quitMouseHandler *mouse.Handler
-	palette          palette.Model
+	showPalette             bool
+	showQuitConfirm         bool
+	quitModal               *modal.Modal
+	quitMouseHandler        *mouse.Handler
+	palette                 palette.Model
 
 	// Project switcher modal
 	showProjectSwitcher         bool
@@ -161,15 +162,15 @@ type Model struct {
 	cachedWorktreeInfo *WorktreeInfo
 
 	// Theme switcher modal
-	showThemeSwitcher          bool
-	themeSwitcherModal         *modal.Modal
-	themeSwitcherModalWidth    int
-	themeSwitcherMouseHandler  *mouse.Handler
-	themeSwitcherSelectedIdx   int
-	themeSwitcherInput         textinput.Model
-	themeSwitcherFiltered      []themeEntry
-	themeSwitcherOriginal      themeEntry // original theme to restore on cancel
-	themeSwitcherScope         string     // "global" or "project"
+	showThemeSwitcher         bool
+	themeSwitcherModal        *modal.Modal
+	themeSwitcherModalWidth   int
+	themeSwitcherMouseHandler *mouse.Handler
+	themeSwitcherSelectedIdx  int
+	themeSwitcherInput        textinput.Model
+	themeSwitcherFiltered     []themeEntry
+	themeSwitcherOriginal     themeEntry // original theme to restore on cancel
+	themeSwitcherScope        string     // "global" or "project"
 
 	// Issue preview - input phase
 	showIssueInput         bool
@@ -179,11 +180,11 @@ type Model struct {
 	issueInputMouseHandler *mouse.Handler
 
 	// Issue input auto-complete
-	issueSearchResults      []IssueSearchResult
-	issueSearchQuery        string // last query sent to td search
-	issueSearchLoading      bool
-	issueSearchCursor       int  // selected result index (-1 = none/input focused)
-	issueSearchScrollOffset int  // viewport scroll offset for search results
+	issueSearchResults       []IssueSearchResult
+	issueSearchQuery         string // last query sent to td search
+	issueSearchLoading       bool
+	issueSearchCursor        int  // selected result index (-1 = none/input focused)
+	issueSearchScrollOffset  int  // viewport scroll offset for search results
 	issueSearchIncludeClosed bool // whether to include closed issues in search
 
 	// Issue preview - preview phase
@@ -233,20 +234,20 @@ type Model struct {
 	changelogScrollState  *changelogViewState // Shared state for modal closure
 
 	// Update modal (declarative)
-	updatePreviewModal        *modal.Modal
-	updatePreviewModalWidth   int
-	updatePreviewMouseHandler *mouse.Handler
-	updateCompleteModal       *modal.Modal
-	updateCompleteModalWidth  int
+	updatePreviewModal         *modal.Modal
+	updatePreviewModalWidth    int
+	updatePreviewMouseHandler  *mouse.Handler
+	updateCompleteModal        *modal.Modal
+	updateCompleteModalWidth   int
 	updateCompleteMouseHandler *mouse.Handler
-	updateErrorModal          *modal.Modal
-	updateErrorModalWidth     int
-	updateErrorMouseHandler   *mouse.Handler
-	changelogModal            *modal.Modal
-	changelogModalWidth       int
-	changelogMouseHandler     *mouse.Handler
-	changelogRenderedLines    []string // Cached rendered changelog lines
-	changelogMaxVisibleLines  int      // Max lines visible in viewport
+	updateErrorModal           *modal.Modal
+	updateErrorModalWidth      int
+	updateErrorMouseHandler    *mouse.Handler
+	changelogModal             *modal.Modal
+	changelogModalWidth        int
+	changelogMouseHandler      *mouse.Handler
+	changelogRenderedLines     []string // Cached rendered changelog lines
+	changelogMaxVisibleLines   int      // Max lines visible in viewport
 
 	// Intro animation
 	intro IntroModel
@@ -272,16 +273,16 @@ func New(reg *plugin.Registry, km *keymap.Registry, cfg *config.Config, currentV
 	}
 
 	return Model{
-		cfg:                   cfg,
-		registry:              reg,
-		keymap:                km,
-		activePlugin:          activeIdx,
-		activeContext:         "global",
-		showClock:             cfg.UI.ShowClock,
-		palette:               palette.New(),
-		ui:                    ui,
-		ready:                 false,
-		intro:                 NewIntroModel(repoName),
+		cfg:               cfg,
+		registry:          reg,
+		keymap:            km,
+		activePlugin:      activeIdx,
+		activeContext:     "global",
+		showClock:         cfg.UI.ShowClock,
+		palette:           palette.New(),
+		ui:                ui,
+		ready:             false,
+		intro:             NewIntroModel(repoName),
 		currentVersion:    currentVersion,
 		updatePhaseStatus: make(map[UpdatePhase]string),
 	}
@@ -458,13 +459,13 @@ func (m *Model) runCheckPrerequisites() tea.Cmd {
 	return func() tea.Msg {
 		switch method {
 		case version.InstallMethodHomebrew:
-			if _, err := exec.LookPath("brew"); err != nil {
+			if _, err := hostexec.LookPath("brew"); err != nil {
 				return UpdateErrorMsg{Step: "check", Err: fmt.Errorf("brew not found in PATH")}
 			}
 		case version.InstallMethodBinary:
 			// No prerequisites for binary download — just show the URL
 		default:
-			if _, err := exec.LookPath("go"); err != nil {
+			if _, err := hostexec.LookPath("go"); err != nil {
 				return UpdateErrorMsg{Step: "check", Err: fmt.Errorf("go not found in PATH")}
 			}
 		}
@@ -484,14 +485,14 @@ func (m *Model) runInstallPhase() tea.Cmd {
 
 		// Refresh Homebrew tap so brew knows about new versions
 		if method == version.InstallMethodHomebrew {
-			_ = exec.Command("brew", "update").Run() // best-effort
+			_ = hostexec.Command("brew", "update").Run() // best-effort
 		}
 
 		// Update sidecar
 		if sidecarUpdate != nil {
 			switch method {
 			case version.InstallMethodHomebrew:
-				cmd := exec.Command("brew", "upgrade", "sidecar")
+				cmd := hostexec.Command("brew", "upgrade", "sidecar")
 				output, err := cmd.CombinedOutput()
 				if err != nil {
 					return UpdateErrorMsg{Step: "sidecar", Err: fmt.Errorf("%v: %s", err, output)}
@@ -511,7 +512,7 @@ func (m *Model) runInstallPhase() tea.Cmd {
 					"-ldflags", fmt.Sprintf("-X main.Version=%s", sidecarUpdate.LatestVersion),
 					fmt.Sprintf("github.com/marcus/sidecar/cmd/sidecar@%s", sidecarUpdate.LatestVersion),
 				}
-				cmd := exec.Command("go", args...)
+				cmd := hostexec.Command("go", args...)
 				if output, err := cmd.CombinedOutput(); err != nil {
 					return UpdateErrorMsg{Step: "sidecar", Err: fmt.Errorf("%v: %s", err, output)}
 				}
@@ -524,7 +525,7 @@ func (m *Model) runInstallPhase() tea.Cmd {
 		if tdUpdate != nil && tdUpdate.HasUpdate && tdUpdate.Installed {
 			switch method {
 			case version.InstallMethodHomebrew:
-				cmd := exec.Command("brew", "upgrade", "td")
+				cmd := hostexec.Command("brew", "upgrade", "td")
 				output, err := cmd.CombinedOutput()
 				if err != nil {
 					return UpdateErrorMsg{Step: "td", Err: fmt.Errorf("%v: %s", err, output)}
@@ -534,7 +535,7 @@ func (m *Model) runInstallPhase() tea.Cmd {
 					return UpdateErrorMsg{Step: "td", Err: fmt.Errorf("brew reports td is already at latest version — tap may be out of date. Try: brew update && brew upgrade td")}
 				}
 			default: // Go install (binary users of td still use go install)
-				cmd := exec.Command("go", "install",
+				cmd := hostexec.Command("go", "install",
 					fmt.Sprintf("github.com/marcus/td@%s", tdUpdate.LatestVersion))
 				if output, err := cmd.CombinedOutput(); err != nil {
 					return UpdateErrorMsg{Step: "td", Err: fmt.Errorf("%v: %s", err, output)}
@@ -558,12 +559,12 @@ func (m *Model) runVerifyPhase(installResult UpdateInstallDoneMsg) tea.Cmd {
 	return func() tea.Msg {
 		// Verify sidecar binary if it was updated
 		if installResult.SidecarUpdated {
-			sidecarPath, err := exec.LookPath("sidecar")
+			sidecarPath, err := hostexec.LookPath("sidecar")
 			if err != nil {
 				return UpdateErrorMsg{Step: "verify", Err: fmt.Errorf("sidecar not found in PATH after install")}
 			}
 			// Verify the binary is executable by running --version
-			cmd := exec.Command(sidecarPath, "--version")
+			cmd := hostexec.Command(sidecarPath, "--version")
 			output, err := cmd.Output()
 			if err != nil {
 				return UpdateErrorMsg{Step: "verify", Err: fmt.Errorf("sidecar binary not executable: %v", err)}
@@ -582,12 +583,12 @@ func (m *Model) runVerifyPhase(installResult UpdateInstallDoneMsg) tea.Cmd {
 
 		// Verify td binary if it was updated
 		if installResult.TdUpdated {
-			tdPath, err := exec.LookPath("td")
+			tdPath, err := hostexec.LookPath("td")
 			if err != nil {
 				return UpdateErrorMsg{Step: "verify", Err: fmt.Errorf("td not found in PATH after install")}
 			}
 			// Verify the binary is executable
-			cmd := exec.Command(tdPath, "version", "--short")
+			cmd := hostexec.Command(tdPath, "version", "--short")
 			if err := cmd.Run(); err != nil {
 				return UpdateErrorMsg{Step: "verify", Err: fmt.Errorf("td binary not executable: %v", err)}
 			}

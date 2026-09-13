@@ -14,8 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/marcus/sidecar/internal/adapter"
 	_ "github.com/mattn/go-sqlite3"
+
+	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 const (
@@ -33,7 +35,7 @@ type Adapter struct {
 
 // New creates a new Kiro adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, _ := userhome.Dir()
 	dbPath := findKiroDB(home)
 	return &Adapter{
 		dbPath: dbPath,
@@ -66,22 +68,22 @@ func kiroDBCandidates(home string) []string {
 	case "darwin":
 		candidates = append(candidates, filepath.Join(home, "Library", "Application Support", "kiro-cli", "data.sqlite3"))
 	case "linux":
-		dataHome := os.Getenv("XDG_DATA_HOME")
+		dataHome := userhome.Getenv("XDG_DATA_HOME")
 		if dataHome == "" {
 			dataHome = filepath.Join(home, ".local", "share")
 		}
 		candidates = append(candidates, filepath.Join(dataHome, "kiro-cli", "data.sqlite3"))
-		configHome := os.Getenv("XDG_CONFIG_HOME")
+		configHome := userhome.Getenv("XDG_CONFIG_HOME")
 		if configHome == "" {
 			configHome = filepath.Join(home, ".config")
 		}
 		candidates = append(candidates, filepath.Join(configHome, "kiro-cli", "data.sqlite3"))
 	case "windows":
-		appData := os.Getenv("APPDATA")
+		appData := userhome.Getenv("APPDATA")
 		if appData != "" {
 			candidates = append(candidates, filepath.Join(appData, "kiro-cli", "data.sqlite3"))
 		}
-		localAppData := os.Getenv("LOCALAPPDATA")
+		localAppData := userhome.Getenv("LOCALAPPDATA")
 		if localAppData != "" {
 			candidates = append(candidates, filepath.Join(localAppData, "kiro-cli", "data.sqlite3"))
 		}
@@ -594,4 +596,3 @@ func truncateOutput(s string, maxLen int) string {
 	}
 	return s[:maxLen-3] + "..."
 }
-

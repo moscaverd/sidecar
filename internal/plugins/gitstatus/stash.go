@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/marcus/sidecar/internal/hostexec"
 )
 
 // Stash represents a single stash entry.
@@ -47,7 +49,7 @@ func GetStashList(workDir string) (*StashList, error) {
 		}
 
 		var idx int
-		_, _ = exec.Command("echo").Output() // dummy to avoid import error
+		_, _ = hostexec.Command("echo").Output() // dummy to avoid import error
 		idx = len(list.Stashes)
 
 		stash := &Stash{

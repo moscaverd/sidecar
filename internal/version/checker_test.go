@@ -2,10 +2,14 @@ package version
 
 import (
 	"net/http"
-	"net/http/httptest"
+	"os/exec"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/marcus/sidecar/internal/hostexec"
+	"github.com/marcus/sidecar/internal/testutil"
 )
 
 func TestUpdateCommand(t *testing.T) {
@@ -52,7 +56,6 @@ func TestUpdateCommand(t *testing.T) {
 		})
 	}
 }
-
 
 func TestCheck_DevelopmentVersion(t *testing.T) {
 	// Development versions should return empty result without making HTTP calls
@@ -106,43 +109,46 @@ func TestCheck_APIErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(tt.statusCode)
-				_, _ = w.Write([]byte(tt.body))
-			}))
-			defer server.Close()
-
-			// Note: We can't easily inject the test server URL into Check()
-			// since it uses a hardcoded URL. This test documents expected behavior.
-			// For real integration testing, we'd need dependency injection.
+			calls := releaseResponse(t, tt.statusCode, tt.body)
+			result := Check("v0.9.0")
+			if *calls != 1 || (result.Error != nil) != tt.wantErr {
+				t.Fatalf("calls=%d result=%+v", *calls, result)
+			}
+			if !tt.wantErr && (!result.HasUpdate || result.LatestVersion != "v1.0.0" || result.UpdateURL != "https://github.com/marcus/sidecar/releases/tag/v1.0.0") {
+				t.Fatalf("release response lost: %+v", result)
+			}
 		})
 	}
 }
 
 func TestCheck_InvalidJSON(t *testing.T) {
-	// Test handling of malformed JSON responses
-	// This verifies json.Decoder error handling
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{invalid json`))
-	}))
-	defer server.Close()
-
-	// Note: Can't inject test server without modifying Check().
-	// This test documents the expected behavior.
+	calls := releaseResponse(t, http.StatusOK, `{invalid json`)
+	result := Check("v0.9.0")
+	if *calls != 1 || result.Error == nil {
+		t.Fatalf("calls=%d result=%+v", *calls, result)
+	}
 }
 
 func TestCheckAsync_CacheHit(t *testing.T) {
-	// CheckAsync should return cached result when cache is valid
-	// This is more of a documentation test since we can't easily mock LoadCache
-
-	// When cache is valid and has update:
-	// - Should return UpdateAvailableMsg
-	// - Should NOT make HTTP request
-
-	// When cache is valid and no update:
-	// - Should return nil
-	// - Should NOT make HTTP request
+	testutil.Home(t, t.TempDir())
+	calls := releaseResponse(t, http.StatusInternalServerError, "unexpected cache miss")
+	for _, hasUpdate := range []bool{true, false} {
+		if err := SaveCache(&CacheEntry{CurrentVersion: "v1.0.0", LatestVersion: "v1.1.0", HasUpdate: hasUpdate, CheckedAt: time.Now()}); err != nil {
+			t.Fatal(err)
+		}
+		msg := CheckAsync("v1.0.0")()
+		if hasUpdate {
+			update, ok := msg.(UpdateAvailableMsg)
+			if !ok || update.CurrentVersion != "v1.0.0" || update.LatestVersion != "v1.1.0" {
+				t.Fatalf("cache update lost: %+v", msg)
+			}
+		} else if msg != nil {
+			t.Fatalf("up-to-date cache returned %+v", msg)
+		}
+	}
+	if *calls != 0 {
+		t.Fatalf("cache hit made %d requests", *calls)
+	}
 }
 
 func TestUpdateAvailableMsg(t *testing.T) {
@@ -276,15 +282,19 @@ func TestTdVersionMsg(t *testing.T) {
 }
 
 func TestGetTdVersion(t *testing.T) {
-	// GetTdVersion runs `td version --short` and returns trimmed output
-	// When td is not installed or fails, returns empty string
-	//
-	// This is a behavioral test - actual output depends on system state.
-	// We verify the function doesn't panic and returns a string.
-	version := GetTdVersion()
-	// Version is either empty (td not installed) or a version string
-	// We can't assert the exact value, but we can verify it's not a panic
-	_ = version
+	previous := hostexec.Command
+	var got []string
+	hostexec.Command = func(name string, args ...string) *exec.Cmd {
+		got = append([]string{name}, args...)
+		return &exec.Cmd{Args: got, Err: exec.ErrNotFound}
+	}
+	t.Cleanup(func() { hostexec.Command = previous })
+	if version := GetTdVersion(); version != "" {
+		t.Fatalf("failed command returned version %q", version)
+	}
+	if !reflect.DeepEqual(got, []string{"td", "version", "--short"}) {
+		t.Fatalf("unexpected td lookup: %v", got)
+	}
 }
 
 func TestCheckTdAsync(t *testing.T) {

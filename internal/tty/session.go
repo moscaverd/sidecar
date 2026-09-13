@@ -2,11 +2,12 @@ package tty
 
 import (
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/marcus/sidecar/internal/tmuxcmd"
 )
 
 // IsSessionDeadError checks if an error indicates the tmux session/pane is gone.
@@ -24,7 +25,7 @@ func IsSessionDeadError(err error) bool {
 // SendKeyToTmux sends a key to a tmux pane using send-keys.
 // Uses the tmux key name syntax (e.g., "Enter", "C-c", "Up").
 func SendKeyToTmux(sessionName, key string) error {
-	cmd := exec.Command("tmux", "send-keys", "-t", sessionName, key)
+	cmd := tmuxcmd.Command("send-keys", "-t", sessionName, key)
 	return cmd.Run()
 }
 
@@ -39,9 +40,9 @@ func SendLiteralToTmux(sessionName, text string) error {
 		for _, b := range []byte(text) {
 			args = append(args, fmt.Sprintf("%02x", b))
 		}
-		return exec.Command("tmux", args...).Run()
+		return tmuxcmd.Command(args...).Run()
 	}
-	cmd := exec.Command("tmux", "send-keys", "-l", "-t", sessionName, text)
+	cmd := tmuxcmd.Command("send-keys", "-l", "-t", sessionName, text)
 	return cmd.Run()
 }
 
@@ -79,7 +80,7 @@ func ResizeTmuxPane(paneID string, width, height int) {
 	if height > 0 {
 		args = append(args, "-y", strconv.Itoa(height))
 	}
-	cmd := exec.Command("tmux", args...)
+	cmd := tmuxcmd.Command(args...)
 	if err := cmd.Run(); err == nil {
 		return
 	}
@@ -92,14 +93,14 @@ func ResizeTmuxPane(paneID string, width, height int) {
 	if height > 0 {
 		args = append(args, "-y", strconv.Itoa(height))
 	}
-	_ = exec.Command("tmux", args...).Run()
+	_ = tmuxcmd.Command(args...).Run()
 }
 
 // SetWindowSizeManual sets the tmux window-size option to "manual" for a session.
 // This prevents tmux from auto-constraining window size based on attached clients,
 // allowing resize-window commands to stick reliably.
 func SetWindowSizeManual(sessionName string) {
-	_ = exec.Command("tmux", "set-option", "-t", sessionName, "window-size", "manual").Run()
+	_ = tmuxcmd.Command("set-option", "-t", sessionName, "window-size", "manual").Run()
 }
 
 // QueryPaneSize queries the current size of a tmux pane.
@@ -108,7 +109,7 @@ func QueryPaneSize(target string) (width, height int, ok bool) {
 		return 0, 0, false
 	}
 
-	cmd := exec.Command("tmux", "display-message", "-t", target, "-p", "#{pane_width},#{pane_height}")
+	cmd := tmuxcmd.Command("display-message", "-t", target, "-p", "#{pane_width},#{pane_height}")
 	output, err := cmd.Output()
 	if err != nil {
 		return 0, 0, false
@@ -149,7 +150,7 @@ func CapturePaneOutput(target string, scrollback int) (string, error) {
 	if scrollback > 0 {
 		args = append(args, "-S", fmt.Sprintf("-%d", scrollback))
 	}
-	cmd := exec.Command("tmux", args...)
+	cmd := tmuxcmd.Command(args...)
 	output, err := cmd.Output()
 	if err != nil {
 		return "", err

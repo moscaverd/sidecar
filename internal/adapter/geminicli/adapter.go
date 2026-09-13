@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 const (
@@ -41,7 +42,7 @@ type sessionMetaCacheEntry struct {
 
 // New creates a new Gemini CLI adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, _ := userhome.Dir()
 	return &Adapter{
 		tmpDir:       filepath.Join(home, ".gemini", "tmp"),
 		sessionIndex: make(map[string]string),

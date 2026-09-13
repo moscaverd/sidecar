@@ -1,13 +1,14 @@
 package tty
 
 import (
-	"os/exec"
 	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+
 	"github.com/marcus/sidecar/internal/styles"
+	"github.com/marcus/sidecar/internal/tmuxcmd"
 )
 
 // CursorStyle returns the cursor style using current theme colors.
@@ -72,7 +73,7 @@ func QueryCursorPositionSync(target string) (row, col, paneHeight, paneWidth int
 		return 0, 0, 0, 0, false, false
 	}
 
-	cmd := exec.Command("tmux", "display-message", "-t", target,
+	cmd := tmuxcmd.Command("display-message", "-t", target,
 		"-p", "#{cursor_x},#{cursor_y},#{cursor_flag},#{pane_height},#{pane_width}")
 	output, err := cmd.Output()
 	if err != nil {

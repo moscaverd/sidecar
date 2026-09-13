@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
-	"maps"
 	"sort"
 	"strings"
 	"sync"
@@ -15,6 +15,7 @@ import (
 
 	"github.com/marcus/sidecar/internal/adapter"
 	"github.com/marcus/sidecar/internal/adapter/cache"
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 const (
@@ -93,7 +94,7 @@ type Adapter struct {
 
 // New creates a new Pi adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, _ := userhome.Dir()
 	return &Adapter{
 		sessionsDir:  filepath.Join(home, ".openclaw", "agents", "main", "sessions"),
 		sessionIndex: make(map[string]string),

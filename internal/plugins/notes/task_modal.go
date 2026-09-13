@@ -2,12 +2,13 @@ package notes
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/marcus/sidecar/internal/hostexec"
 	"github.com/marcus/sidecar/internal/modal"
 	"github.com/marcus/sidecar/internal/mouse"
 	appmsg "github.com/marcus/sidecar/internal/msg"
@@ -232,7 +233,7 @@ func (p *Plugin) createTaskFromNote() tea.Cmd {
 			args = append(args, "--description", desc)
 		}
 
-		cmd := exec.Command("td", args...)
+		cmd := hostexec.Command("td", args...)
 		cmd.Dir = p.ctx.WorkDir
 		output, err := cmd.CombinedOutput()
 		if err != nil {

@@ -266,19 +266,71 @@ func TestGetCommitDiff_WithParentHash(t *testing.T) {
 }
 
 func TestGetCommitDiff_NonExistentPath(t *testing.T) {
-	workDir := findRepoRoot(t)
-
-	out, err := exec.Command("git", "-C", workDir, "log", "--format=%H", "-1").Output()
-	if err != nil || len(strings.TrimSpace(string(out))) == 0 {
-		t.Skip("no commits in repo")
+	workDir := t.TempDir()
+	git := func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false"}, args...)...)
+		cmd.Dir = workDir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("fixture git %v: %v\n%s", args, err, out)
+		}
+		return strings.TrimSpace(string(out))
 	}
-	hash := strings.TrimSpace(string(out))
-
-	diff, err := GetCommitDiff(workDir, hash, "nonexistent/path/that/does/not/exist.xyz", "")
-	if err != nil {
-		t.Fatalf("GetCommitDiff with non-existent path returned error: %v", err)
+	write := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(workDir, name), []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if diff != "" {
-		t.Errorf("expected empty diff for non-existent path, got: %q", diff)
+	git("init", "-b", "fixture-main")
+	write("normal.txt", "before\n")
+	git("add", "normal.txt")
+	git("commit", "-m", "fixture base")
+	base := git("rev-parse", "HEAD")
+	write("normal.txt", "after\n")
+	git("commit", "-am", "fixture normal commit")
+	normal := git("rev-parse", "HEAD")
+	git("checkout", "-b", "fixture-side", base)
+	write("side.txt", "side change\n")
+	git("add", "side.txt")
+	git("commit", "-m", "fixture side commit")
+	git("checkout", "fixture-main")
+	git("merge", "--no-ff", "-m", "fixture merge", "fixture-side")
+	merge := git("rev-parse", "HEAD")
+	shallowDir := t.TempDir()
+	if out, err := exec.Command("git", "clone", "--no-local", "--depth=1", workDir, shallowDir).CombinedOutput(); err != nil {
+		t.Fatalf("clone shallow fixture: %v\n%s", err, out)
+	}
+	if out, err := exec.Command("git", "-C", shallowDir, "rev-parse", "--is-shallow-repository").CombinedOutput(); err != nil || strings.TrimSpace(string(out)) != "true" {
+		t.Fatalf("fixture is not a shallow checkout: %v\n%s", err, out)
+	}
+
+	for _, tc := range []struct {
+		name, dir, hash, parent, changedPath, addedLine string
+	}{
+		{"normal", workDir, normal, "", "normal.txt", "+after"},
+		{"merge combined", workDir, merge, "", "", ""},
+		{"merge first parent", workDir, merge, normal, "side.txt", "+side change"},
+		{"shallow merge", shallowDir, merge, "", "side.txt", "+side change"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			diff, err := GetCommitDiff(tc.dir, tc.hash, "nonexistent/path/that/does/not/exist.xyz", tc.parent)
+			if err != nil {
+				t.Fatalf("GetCommitDiff with non-existent path returned error: %v", err)
+			}
+			if diff != "" {
+				t.Errorf("expected empty diff for non-existent path, got: %q", diff)
+			}
+			if tc.changedPath != "" {
+				diff, err = GetCommitDiff(tc.dir, tc.hash, tc.changedPath, tc.parent)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !strings.HasPrefix(diff, "diff --git ") || !strings.Contains(diff, tc.addedLine) {
+					t.Errorf("expected file patch with %q, got: %q", tc.addedLine, diff)
+				}
+			}
+		})
 	}
 }

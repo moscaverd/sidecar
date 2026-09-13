@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -12,8 +11,10 @@ import (
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/marcus/sidecar/internal/community"
 	"github.com/marcus/sidecar/internal/config"
+	"github.com/marcus/sidecar/internal/hostexec"
 	"github.com/marcus/sidecar/internal/mouse"
 	"github.com/marcus/sidecar/internal/palette"
 	"github.com/marcus/sidecar/internal/plugin"
@@ -331,7 +332,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			args = append(args, fmt.Sprintf("+%d", msg.LineNo))
 		}
 		args = append(args, msg.Path)
-		c := exec.Command(msg.Editor, args...)
+		c := hostexec.Command(msg.Editor, args...)
 		termState, _ := term.GetState(int(os.Stdout.Fd()))
 		return m, tea.ExecProcess(c, func(err error) tea.Msg {
 			if termState != nil {

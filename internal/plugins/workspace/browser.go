@@ -5,7 +5,9 @@ import (
 	"runtime"
 
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/marcus/sidecar/internal/app"
+	"github.com/marcus/sidecar/internal/hostexec"
 )
 
 // openInBrowser opens the URL in the default browser.
@@ -14,11 +16,11 @@ func openInBrowser(url string) tea.Cmd {
 		var cmd *exec.Cmd
 		switch runtime.GOOS {
 		case "darwin":
-			cmd = exec.Command("open", url)
+			cmd = hostexec.Command("open", url)
 		case "windows":
-			cmd = exec.Command("cmd", "/c", "start", url)
+			cmd = hostexec.Command("cmd", "/c", "start", url)
 		case "linux":
-			cmd = exec.Command("xdg-open", url)
+			cmd = hostexec.Command("xdg-open", url)
 		default:
 			return nil
 		}

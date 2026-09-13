@@ -364,16 +364,15 @@ function WorkspacesPane() {
 }
 
 function Frame({ activeTab, onTabChange }) {
-  const [time, setTime] = useState(() => {
-    const now = new Date();
-    return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
-  });
+  // Server output and the first browser render must agree before hydration.
+  const [time, setTime] = useState('--:--');
 
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
       setTime(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }));
     };
+    updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);

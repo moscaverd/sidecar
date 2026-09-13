@@ -1,8 +1,11 @@
 package tdmonitor
 
 import (
+	"database/sql"
+	_ "embed"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -80,9 +83,14 @@ func TestFormatCount(t *testing.T) {
 }
 
 func TestInitWithNonExistentDatabase(t *testing.T) {
+	root := t.TempDir()
+	// Existing local directory stops td from resolving global project associations.
+	if err := os.Mkdir(filepath.Join(root, ".todos"), 0700); err != nil {
+		t.Fatal(err)
+	}
 	p := New()
 	ctx := &plugin.Context{
-		WorkDir: "/nonexistent/path",
+		WorkDir: root,
 		Logger:  slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
 	}
 
@@ -103,25 +111,7 @@ func TestInitWithNonExistentDatabase(t *testing.T) {
 }
 
 func TestInitWithValidDatabase(t *testing.T) {
-	// Find project root by walking up to find .todos
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Skip("couldn't get working directory")
-	}
-
-	// The test runs from internal/plugins/tdmonitor, so go up to project root
-	projectRoot := cwd
-	for i := 0; i < 5; i++ {
-		if _, err := os.Stat(projectRoot + "/.todos/issues.db"); err == nil {
-			break
-		}
-		projectRoot = projectRoot + "/.."
-	}
-
-	// Verify we found a .todos directory
-	if _, err := os.Stat(projectRoot + "/.todos/issues.db"); err != nil {
-		t.Skip("no .todos database found in project hierarchy")
-	}
+	projectRoot := monitorFixture(t)
 
 	p := New()
 	ctx := &plugin.Context{
@@ -129,7 +119,7 @@ func TestInitWithValidDatabase(t *testing.T) {
 		Logger:  slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
 	}
 
-	err = p.Init(ctx)
+	err := p.Init(ctx)
 	if err != nil {
 		t.Errorf("Init failed: %v", err)
 	}
@@ -144,31 +134,16 @@ func TestInitWithValidDatabase(t *testing.T) {
 }
 
 func TestDiagnosticsWithDatabase(t *testing.T) {
-	// Find project root by walking up to find .todos
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Skip("couldn't get working directory")
-	}
-
-	projectRoot := cwd
-	for i := 0; i < 5; i++ {
-		if _, err := os.Stat(projectRoot + "/.todos/issues.db"); err == nil {
-			break
-		}
-		projectRoot = projectRoot + "/.."
-	}
-
-	// Verify we found a .todos directory
-	if _, err := os.Stat(projectRoot + "/.todos/issues.db"); err != nil {
-		t.Skip("no .todos database found in project hierarchy")
-	}
+	projectRoot := monitorFixture(t)
 
 	p := New()
 	ctx := &plugin.Context{
 		WorkDir: projectRoot,
 		Logger:  slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError})),
 	}
-	_ = p.Init(ctx)
+	if err := p.Init(ctx); err != nil {
+		t.Fatal(err)
+	}
 	defer p.Stop()
 
 	diags := p.Diagnostics()
@@ -228,4 +203,32 @@ func TestViewWithoutModel(t *testing.T) {
 	if view == "" {
 		t.Error("expected non-empty view")
 	}
+}
+
+// The pinned base schema intentionally runs td's real migrations in NewEmbedded.
+//
+//go:embed testdata/td-v0.37-base-schema.sql
+var monitorSchema string
+
+func monitorFixture(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	// td migrates process-cwd session files and reads the current Git branch.
+	t.Chdir(root)
+	t.Setenv("TD_SESSION_ID", "sidecar-monitor-fixture")
+	if err := os.Mkdir(filepath.Join(root, ".todos"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	db, err := sql.Open("sqlite", filepath.Join(root, ".todos", "issues.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(monitorSchema); err != nil {
+		_ = db.Close()
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return root
 }

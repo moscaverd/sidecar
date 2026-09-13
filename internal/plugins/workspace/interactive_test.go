@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -598,6 +599,7 @@ func TestHandleInteractiveKeys_DoubleEscapeExits(t *testing.T) {
 
 // TestHandleInteractiveKeys_NonEscapeClearsPendingEscape tests non-escape key clears pending flag
 func TestHandleInteractiveKeys_NonEscapeClearsPendingEscape(t *testing.T) {
+	calls := captureTmuxCommands(t)
 	p := &Plugin{
 		viewMode: ViewModeInteractive,
 		interactiveState: &InteractiveState{
@@ -607,11 +609,20 @@ func TestHandleInteractiveKeys_NonEscapeClearsPendingEscape(t *testing.T) {
 		},
 	}
 
-	// Note: We can't fully test this without mocking tmux commands
-	// The actual sendKeyToTmux will fail, which will exit interactive mode
-	// But we can verify the flag is cleared before the call
+	// Capture the real forwarding arguments, then simulate a missing session.
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")}
-	_ = p.handleInteractiveKeys(msg)
+	cmd := p.handleInteractiveKeys(msg)
+	if cmd == nil {
+		t.Fatal("missing asynchronous key command")
+	}
+	// With no selected worktree the debounce command is nil, so Bubble Tea
+	// compacts the batch to the actual send callback.
+	if _, ok := cmd().(InteractiveSessionDeadMsg); !ok {
+		t.Fatal("missing-session send did not report disconnect")
+	}
+	if !reflect.DeepEqual(*calls, [][]string{{"send-keys", "-t", "test", "Escape"}}) {
+		t.Fatalf("pending escape was not forwarded before detecting the dead session: %v", *calls)
+	}
 
 	// The EscapePressed flag should be cleared
 	// (state might be nil if tmux command failed)
@@ -1046,10 +1057,10 @@ func TestHandleInteractiveKeys_CancelsPendingEscapeForMouseSequence(t *testing.T
 	p := &Plugin{
 		viewMode: ViewModeInteractive,
 		interactiveState: &InteractiveState{
-			Active:          true,
-			TargetSession:   "test-session",
-			EscapePressed:   true, // ESC arrived first (split-read)
-			EscapeTime:      time.Now(),
+			Active:        true,
+			TargetSession: "test-session",
+			EscapePressed: true, // ESC arrived first (split-read)
+			EscapeTime:    time.Now(),
 		},
 	}
 
@@ -1074,6 +1085,7 @@ func TestHandleInteractiveKeys_CancelsPendingEscapeForMouseSequence(t *testing.T
 // TestHandleInteractiveKeys_ForwardsNormalRunes tests that normal rune input is
 // still forwarded (not incorrectly filtered)
 func TestHandleInteractiveKeys_ForwardsNormalRunes(t *testing.T) {
+	calls := captureTmuxCommands(t)
 	p := &Plugin{
 		viewMode: ViewModeInteractive,
 		interactiveState: &InteractiveState{
@@ -1084,10 +1096,20 @@ func TestHandleInteractiveKeys_ForwardsNormalRunes(t *testing.T) {
 
 	// Normal single character should proceed to MapKeyToTmux (will fail at sendKeys but that's ok)
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("a")}
-	_ = p.handleInteractiveKeys(msg)
+	cmd := p.handleInteractiveKeys(msg)
+	if cmd == nil {
+		t.Fatal("missing asynchronous key command")
+	}
+	// With no selected worktree the debounce command is nil, so Bubble Tea
+	// compacts the batch to the actual send callback.
+	if _, ok := cmd().(InteractiveSessionDeadMsg); !ok {
+		t.Fatal("missing-session send did not report disconnect")
+	}
+	if !reflect.DeepEqual(*calls, [][]string{{"send-keys", "-l", "-t", "test-session", "a"}}) {
+		t.Fatalf("normal rune was not forwarded exactly once: %v", *calls)
+	}
 
-	// The key thing is the function didn't panic and tried to forward
-	// (it will exit interactive mode due to tmux command failure, which is expected in test)
+	// The synthetic failure never starts tmux or reaches a real session.
 }
 
 // TestOutputBuffer_StripsPartialMouseSequences tests that OutputBuffer.Update

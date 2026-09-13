@@ -15,6 +15,7 @@ import (
 
 	"github.com/marcus/sidecar/internal/adapter"
 	"github.com/marcus/sidecar/internal/adapter/cache"
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 const (
@@ -28,7 +29,7 @@ const (
 type Adapter struct {
 	threadsDir   string
 	sessionIndex map[string]string // threadID -> file path
-	mu           sync.RWMutex     // guards sessionIndex
+	mu           sync.RWMutex      // guards sessionIndex
 	metaCache    map[string]metaCacheEntry
 	metaMu       sync.RWMutex // guards metaCache
 	msgCache     *cache.Cache[msgCacheEntry]
@@ -49,7 +50,7 @@ type msgCacheEntry struct {
 
 // New creates a new Amp adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, _ := userhome.Dir()
 	threadsDir := findAmpThreadsDir(home)
 	return &Adapter{
 		threadsDir:   threadsDir,
@@ -80,13 +81,13 @@ func ampThreadsDirCandidates(home string) []string {
 	var candidates []string
 
 	// 1. AMP_DATA_HOME override (all platforms)
-	if ampHome := os.Getenv("AMP_DATA_HOME"); ampHome != "" {
+	if ampHome := userhome.Getenv("AMP_DATA_HOME"); ampHome != "" {
 		candidates = append(candidates, filepath.Join(ampHome, "amp", "threads"))
 	}
 
 	// 2. XDG_DATA_HOME (Linux only)
 	if runtime.GOOS == "linux" {
-		if xdgData := os.Getenv("XDG_DATA_HOME"); xdgData != "" {
+		if xdgData := userhome.Getenv("XDG_DATA_HOME"); xdgData != "" {
 			candidates = append(candidates, filepath.Join(xdgData, "amp", "threads"))
 		}
 	}
