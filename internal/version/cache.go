@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 const (
@@ -23,7 +25,7 @@ type CacheEntry struct {
 
 // cachePath returns the full path to the cache file.
 func cachePath() string {
-	home, err := os.UserHomeDir()
+	home, err := userhome.Dir()
 	if err != nil {
 		return ""
 	}
@@ -83,7 +85,7 @@ func IsCacheValid(entry *CacheEntry, currentVersion string) bool {
 
 // tdCachePath returns the full path to the td cache file.
 func tdCachePath() string {
-	home, err := os.UserHomeDir()
+	home, err := userhome.Dir()
 	if err != nil {
 		return ""
 	}

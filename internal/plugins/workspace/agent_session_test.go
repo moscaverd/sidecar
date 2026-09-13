@@ -5,14 +5,16 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/marcus/sidecar/internal/testutil"
 )
 
-// setupClaudeTestDir creates a temp HOME with Claude project directory structure.
-// Uses t.Setenv which auto-restores HOME after the test (parallel-safe).
+// setupClaudeTestDir creates an explicit temporary home lookup with Claude project directory structure.
+// The lookup is restored after each non-parallel test; process HOME is untouched.
 func setupClaudeTestDir(t *testing.T, worktreePath string) (tmpHome, projectDir string) {
 	t.Helper()
 	tmpHome = t.TempDir()
-	t.Setenv("HOME", tmpHome)
+	testutil.Home(t, tmpHome)
 
 	projectDirName := claudeProjectDirName(worktreePath)
 	projectDir = filepath.Join(tmpHome, ".claude", "projects", projectDirName)
@@ -170,7 +172,7 @@ func TestDetectClaudeSessionStatus_StaleWithHookProgress(t *testing.T) {
 
 func TestDetectClaudeSessionStatus_NoSessionFile(t *testing.T) {
 	tmpHome := t.TempDir()
-	t.Setenv("HOME", tmpHome)
+	testutil.Home(t, tmpHome)
 
 	status, ok := detectClaudeSessionStatus("/nonexistent/path")
 	if ok {
@@ -320,7 +322,7 @@ func TestDetectAgentSessionStatus(t *testing.T) {
 func setupPiTestDir(t *testing.T, worktreePath string) (tmpHome, projectDir string) {
 	t.Helper()
 	tmpHome = t.TempDir()
-	t.Setenv("HOME", tmpHome)
+	testutil.Home(t, tmpHome)
 
 	// Pi encodes paths: strip leading slash, replace slashes with dashes, wrap in --
 	path := worktreePath[1:] // strip leading /
@@ -528,7 +530,7 @@ func TestFindCodexSessionForPath_NoMatch(t *testing.T) {
 
 func TestDetectCodexSessionStatus_MtimeActive(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	testutil.Home(t, tmpDir)
 
 	// Create Codex session directory with date hierarchy
 	sessionsDir := filepath.Join(tmpDir, ".codex", "sessions", "2026", "02", "10")
@@ -552,7 +554,7 @@ func TestDetectCodexSessionStatus_MtimeActive(t *testing.T) {
 
 func TestDetectCodexSessionStatus_StaleAssistant(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	testutil.Home(t, tmpDir)
 
 	sessionsDir := filepath.Join(tmpDir, ".codex", "sessions", "2026", "02", "10")
 	if err := os.MkdirAll(sessionsDir, 0755); err != nil {
@@ -576,7 +578,7 @@ func TestDetectCodexSessionStatus_StaleAssistant(t *testing.T) {
 
 func TestDetectCodexSessionStatus_StaleUser(t *testing.T) {
 	tmpDir := t.TempDir()
-	t.Setenv("HOME", tmpDir)
+	testutil.Home(t, tmpDir)
 
 	sessionsDir := filepath.Join(tmpDir, ".codex", "sessions", "2026", "02", "10")
 	if err := os.MkdirAll(sessionsDir, 0755); err != nil {

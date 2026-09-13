@@ -1,11 +1,12 @@
 package tty
 
 import (
-	"os/exec"
 	"strings"
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/marcus/sidecar/internal/tmuxcmd"
 )
 
 // IsPasteInput detects if the input is a paste operation.
@@ -29,14 +30,14 @@ func IsPasteInput(msg tea.KeyMsg) bool {
 // Uses load-buffer + paste-buffer which works regardless of app paste mode state.
 func SendPasteToTmux(sessionName, text string) error {
 	// Load text into tmux default buffer via stdin
-	loadCmd := exec.Command("tmux", "load-buffer", "-")
+	loadCmd := tmuxcmd.Command("load-buffer", "-")
 	loadCmd.Stdin = strings.NewReader(text)
 	if err := loadCmd.Run(); err != nil {
 		return err
 	}
 
 	// Paste buffer into target pane
-	pasteCmd := exec.Command("tmux", "paste-buffer", "-t", sessionName)
+	pasteCmd := tmuxcmd.Command("paste-buffer", "-t", sessionName)
 	return pasteCmd.Run()
 }
 

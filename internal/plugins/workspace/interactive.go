@@ -3,7 +3,6 @@ package workspace
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
@@ -12,11 +11,13 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"golang.org/x/term"
+
 	app "github.com/marcus/sidecar/internal/app"
 	"github.com/marcus/sidecar/internal/features"
 	"github.com/marcus/sidecar/internal/styles"
+	"github.com/marcus/sidecar/internal/tmuxcmd"
 	"github.com/marcus/sidecar/internal/tty"
-	"golang.org/x/term"
 )
 
 // Interactive mode constants
@@ -164,7 +165,7 @@ func MapKeyToTmux(msg tea.KeyMsg) (key string, useLiteral bool) {
 // sendKeyToTmux sends a key to a tmux pane using send-keys.
 // Uses the tmux key name syntax (e.g., "Enter", "C-c", "Up").
 func sendKeyToTmux(sessionName, key string) error {
-	cmd := exec.Command("tmux", "send-keys", "-t", sessionName, key)
+	cmd := tmuxcmd.Command("send-keys", "-t", sessionName, key)
 	return cmd.Run()
 }
 
@@ -179,9 +180,9 @@ func sendLiteralToTmux(sessionName, text string) error {
 		for _, b := range []byte(text) {
 			args = append(args, fmt.Sprintf("%02x", b))
 		}
-		return exec.Command("tmux", args...).Run()
+		return tmuxcmd.Command(args...).Run()
 	}
-	cmd := exec.Command("tmux", "send-keys", "-l", "-t", sessionName, text)
+	cmd := tmuxcmd.Command("send-keys", "-l", "-t", sessionName, text)
 	return cmd.Run()
 }
 
@@ -232,14 +233,14 @@ func sendInteractivePasteInputCmd(sessionName, text string, bracketed bool) tea.
 // Uses load-buffer + paste-buffer which works regardless of app paste mode state.
 func sendPasteToTmux(sessionName, text string) error {
 	// Load text into tmux default buffer via stdin
-	loadCmd := exec.Command("tmux", "load-buffer", "-")
+	loadCmd := tmuxcmd.Command("load-buffer", "-")
 	loadCmd.Stdin = strings.NewReader(text)
 	if err := loadCmd.Run(); err != nil {
 		return err
 	}
 
 	// Paste buffer into target pane
-	pasteCmd := exec.Command("tmux", "paste-buffer", "-t", sessionName)
+	pasteCmd := tmuxcmd.Command("paste-buffer", "-t", sessionName)
 	return pasteCmd.Run()
 }
 
@@ -631,7 +632,7 @@ func (p *Plugin) resizeTmuxPane(paneID string, width, height int) {
 	if height > 0 {
 		args = append(args, "-y", strconv.Itoa(height))
 	}
-	cmd := exec.Command("tmux", args...)
+	cmd := tmuxcmd.Command(args...)
 	if err := cmd.Run(); err == nil {
 		return
 	}
@@ -644,7 +645,7 @@ func (p *Plugin) resizeTmuxPane(paneID string, width, height int) {
 	if height > 0 {
 		args = append(args, "-y", strconv.Itoa(height))
 	}
-	_ = exec.Command("tmux", args...).Run()
+	_ = tmuxcmd.Command(args...).Run()
 }
 
 func queryPaneSize(target string) (width, height int, ok bool) {
@@ -652,7 +653,7 @@ func queryPaneSize(target string) (width, height int, ok bool) {
 		return 0, 0, false
 	}
 
-	cmd := exec.Command("tmux", "display-message", "-t", target, "-p", "#{pane_width},#{pane_height}")
+	cmd := tmuxcmd.Command("display-message", "-t", target, "-p", "#{pane_width},#{pane_height}")
 	output, err := cmd.Output()
 	if err != nil {
 		return 0, 0, false
@@ -701,7 +702,7 @@ func (p *Plugin) resizeForAttachCmd(target string) tea.Cmd {
 // attachWithResize resizes the tmux pane to full terminal, waits briefly for
 // tmux to process, then attaches. Centralizes resize-before-attach logic.
 func (p *Plugin) attachWithResize(target, sessionName, displayName string, onComplete func(error) tea.Msg) tea.Cmd {
-	c := exec.Command("tmux", "attach-session", "-t", sessionName)
+	c := tmuxcmd.Command("attach-session", "-t", sessionName)
 	termState, _ := term.GetState(int(os.Stdout.Fd()))
 	wrappedOnComplete := func(err error) tea.Msg {
 		if termState != nil {
@@ -1292,7 +1293,7 @@ func queryCursorPositionSync(target string) (row, col, paneHeight, paneWidth int
 		return 0, 0, 0, 0, false, false
 	}
 
-	cmd := exec.Command("tmux", "display-message", "-t", target,
+	cmd := tmuxcmd.Command("display-message", "-t", target,
 		"-p", "#{cursor_x},#{cursor_y},#{cursor_flag},#{pane_height},#{pane_width}")
 	output, err := cmd.Output()
 	if err != nil {

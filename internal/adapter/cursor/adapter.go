@@ -18,6 +18,7 @@ import (
 	_ "modernc.org/sqlite"
 
 	"github.com/marcus/sidecar/internal/adapter"
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 // sqlitePoolSettings configures connection pool to prevent FD leaks (td-649ba4).
@@ -57,7 +58,7 @@ type Adapter struct {
 
 // New creates a new Cursor CLI adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, _ := userhome.Dir()
 	return &Adapter{
 		chatsDir:     filepath.Join(home, ".cursor", "chats"),
 		sessionCache: make(map[string]sessionCacheEntry),

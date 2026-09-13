@@ -16,6 +16,7 @@ import (
 	"github.com/marcus/sidecar/internal/adapter"
 	"github.com/marcus/sidecar/internal/adapter/cache"
 	"github.com/marcus/sidecar/internal/adapter/pi"
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 const (
@@ -70,7 +71,7 @@ type Adapter struct {
 
 // New creates a new Pi Agent adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, _ := userhome.Dir()
 	return &Adapter{
 		sessionsDir:  filepath.Join(home, ".pi", "agent", "sessions"),
 		sessionIndex: make(map[string]string),

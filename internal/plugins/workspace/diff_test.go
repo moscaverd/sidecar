@@ -11,9 +11,9 @@ import (
 func TestMergeBaseHashValidation(t *testing.T) {
 	// Test the hash validation logic used in getDiffFromBase
 	tests := []struct {
-		name       string
-		mbOutput   string
-		shouldUse  bool // Should use merge-base hash
+		name      string
+		mbOutput  string
+		shouldUse bool // Should use merge-base hash
 	}{
 		{
 			name:      "valid sha",
@@ -87,9 +87,12 @@ func TestGetUnpushedCommits_EmptyInputs(t *testing.T) {
 
 func TestGetUnpushedCommits_InvalidRemote(t *testing.T) {
 	tmpDir := t.TempDir()
-	exec.Command("git", "init").Dir = tmpDir
-	_ = exec.Command("git", "init").Run()
-	
+	cmd := exec.Command("git", "init")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
+
 	result := getUnpushedCommits(tmpDir, "nonexistent/branch")
 	if result != nil {
 		t.Errorf("expected nil for invalid remote, got %v", result)

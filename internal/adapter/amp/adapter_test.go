@@ -11,6 +11,7 @@ import (
 
 	"github.com/marcus/sidecar/internal/adapter"
 	"github.com/marcus/sidecar/internal/adapter/cache"
+	"github.com/marcus/sidecar/internal/testutil"
 )
 
 // ---------------------------------------------------------------------------
@@ -100,10 +101,10 @@ func fixtureSimpleThread(projectDir string) Thread {
 				{Type: "text", Text: "Of course! I'd be happy to help."},
 			},
 			Usage: &Usage{
-				Model:            "claude-opus-4-6",
-				InputTokens:      80,
-				OutputTokens:     50,
-				TotalInputTokens: 100,
+				Model:                    "claude-opus-4-6",
+				InputTokens:              80,
+				OutputTokens:             50,
+				TotalInputTokens:         100,
 				CacheReadInputTokens:     10,
 				CacheCreationInputTokens: 5,
 			},
@@ -1725,8 +1726,8 @@ func TestAmpThreadsDirCandidates(t *testing.T) {
 
 	t.Run("default candidates", func(t *testing.T) {
 		// Unset env vars for clean test
-		t.Setenv("AMP_DATA_HOME", "")
-		t.Setenv("XDG_DATA_HOME", "")
+		testutil.Env(t, "AMP_DATA_HOME", "")
+		testutil.Env(t, "XDG_DATA_HOME", "")
 
 		candidates := ampThreadsDirCandidates(home)
 
@@ -1743,8 +1744,8 @@ func TestAmpThreadsDirCandidates(t *testing.T) {
 	})
 
 	t.Run("AMP_DATA_HOME override", func(t *testing.T) {
-		t.Setenv("AMP_DATA_HOME", "/custom/amp/data")
-		t.Setenv("XDG_DATA_HOME", "")
+		testutil.Env(t, "AMP_DATA_HOME", "/custom/amp/data")
+		testutil.Env(t, "XDG_DATA_HOME", "")
 
 		candidates := ampThreadsDirCandidates(home)
 
@@ -1757,8 +1758,8 @@ func TestAmpThreadsDirCandidates(t *testing.T) {
 func TestFindAmpThreadsDir(t *testing.T) {
 	t.Run("finds existing directory", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		t.Setenv("AMP_DATA_HOME", "")
-		t.Setenv("XDG_DATA_HOME", "")
+		testutil.Env(t, "AMP_DATA_HOME", "")
+		testutil.Env(t, "XDG_DATA_HOME", "")
 
 		// Create the default directory structure
 		threadsDir := filepath.Join(tmpDir, ".local", "share", "amp", "threads")
@@ -1776,7 +1777,7 @@ func TestFindAmpThreadsDir(t *testing.T) {
 		threadsDir := filepath.Join(customDir, "amp", "threads")
 		_ = os.MkdirAll(threadsDir, 0755)
 
-		t.Setenv("AMP_DATA_HOME", customDir)
+		testutil.Env(t, "AMP_DATA_HOME", customDir)
 
 		result := findAmpThreadsDir(tmpDir)
 		if result != threadsDir {
@@ -1786,8 +1787,8 @@ func TestFindAmpThreadsDir(t *testing.T) {
 
 	t.Run("falls back when no dir exists", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		t.Setenv("AMP_DATA_HOME", "")
-		t.Setenv("XDG_DATA_HOME", "")
+		testutil.Env(t, "AMP_DATA_HOME", "")
+		testutil.Env(t, "XDG_DATA_HOME", "")
 
 		result := findAmpThreadsDir(tmpDir)
 		// Should return first candidate (default path) even though it doesn't exist

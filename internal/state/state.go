@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 // State holds persistent user preferences.
@@ -72,7 +74,7 @@ var (
 
 // Init loads state from the default location.
 func Init() error {
-	home, err := os.UserHomeDir()
+	home, err := userhome.Dir()
 	if err != nil {
 		return err
 	}

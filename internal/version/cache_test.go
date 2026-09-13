@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/marcus/sidecar/internal/testutil"
 )
 
 func TestIsCacheValid(t *testing.T) {
@@ -126,13 +128,11 @@ func TestSaveAndLoadCache(t *testing.T) {
 }
 
 func TestLoadCache_FileNotExist(t *testing.T) {
-	// LoadCache uses os.UserHomeDir() internally, so we can't easily
-	// redirect it. This test verifies error handling for missing files.
-	// The actual cachePath() function will return a real path.
+	testutil.Home(t, t.TempDir())
 	_, err := LoadCache()
-	// Error is expected since cache likely doesn't exist in test env
-	// or if it does exist, that's also fine
-	_ = err
+	if !os.IsNotExist(err) {
+		t.Fatalf("missing fixture cache error = %v", err)
+	}
 }
 
 func TestCacheEntry_JSONRoundtrip(t *testing.T) {

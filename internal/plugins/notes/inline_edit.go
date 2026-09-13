@@ -3,7 +3,6 @@ package notes
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -11,11 +10,14 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	xterm "golang.org/x/term"
+
 	"github.com/marcus/sidecar/internal/features"
+	"github.com/marcus/sidecar/internal/hostexec"
 	"github.com/marcus/sidecar/internal/msg"
 	"github.com/marcus/sidecar/internal/styles"
+	"github.com/marcus/sidecar/internal/tmuxcmd"
 	"github.com/marcus/sidecar/internal/tty"
-	xterm "golang.org/x/term"
 )
 
 // InlineEditStartedMsg is sent when inline edit mode starts successfully.
@@ -70,7 +72,7 @@ func (p *Plugin) enterInlineEditMode(noteID string) tea.Cmd {
 
 	return func() tea.Msg {
 		// Check if tmux is available
-		if _, err := exec.LookPath("tmux"); err != nil {
+		if _, err := hostexec.LookPath("tmux"); err != nil {
 			// Fall back to external editor
 			return nil
 		}
@@ -90,7 +92,7 @@ func (p *Plugin) enterInlineEditMode(noteID string) tea.Cmd {
 			"-x", strconv.Itoa(editorW), "-y", strconv.Itoa(editorH), "-e", "TERM=" + term,
 			editor, notePath}
 
-		cmd := exec.Command("tmux", tmuxArgs...)
+		cmd := tmuxcmd.Command(tmuxArgs...)
 		if err := cmd.Run(); err != nil {
 			return msg.ToastMsg{
 				Message:  fmt.Sprintf("Failed to start editor: %v", err),
@@ -152,7 +154,7 @@ func (p *Plugin) handleInlineEditStarted(msg InlineEditStartedMsg) tea.Cmd {
 func (p *Plugin) exitInlineEditMode() {
 	if p.inlineEditSession != "" {
 		// Kill the tmux session
-		_ = exec.Command("tmux", "kill-session", "-t", p.inlineEditSession).Run()
+		_ = tmuxcmd.Command("kill-session", "-t", p.inlineEditSession).Run()
 	}
 	p.inlineEditMode = false
 	p.inlineEditSession = ""
@@ -508,7 +510,7 @@ func (p *Plugin) isInlineEditSupported() bool {
 	}
 
 	// Check if tmux is available
-	if _, err := exec.LookPath("tmux"); err != nil {
+	if _, err := hostexec.LookPath("tmux"); err != nil {
 		return false
 	}
 
@@ -520,7 +522,7 @@ func (p *Plugin) isInlineEditSessionAlive() bool {
 	if p.inlineEditSession == "" {
 		return false
 	}
-	err := exec.Command("tmux", "has-session", "-t", p.inlineEditSession).Run()
+	err := tmuxcmd.Command("has-session", "-t", p.inlineEditSession).Run()
 	return err == nil
 }
 
@@ -551,7 +553,7 @@ func sendEditorSaveAndQuit(target, editor string) bool {
 
 	send := func(keys ...string) {
 		for _, k := range keys {
-			_ = exec.Command("tmux", "send-keys", "-t", target, k).Run()
+			_ = tmuxcmd.Command("send-keys", "-t", target, k).Run()
 		}
 	}
 
@@ -585,7 +587,7 @@ func sendEditorCursorToEnd(target, editor string) {
 
 	send := func(keys ...string) {
 		for _, k := range keys {
-			_ = exec.Command("tmux", "send-keys", "-t", target, k).Run()
+			_ = tmuxcmd.Command("send-keys", "-t", target, k).Run()
 		}
 	}
 

@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 const (
@@ -59,7 +61,7 @@ type rawPluginsConfig struct {
 	GitStatus     rawGitStatusConfig     `json:"git-status"`
 	TDMonitor     rawTDMonitorConfig     `json:"td-monitor"`
 	Conversations rawConversationsConfig `json:"conversations"`
-	Workspace     rawWorkspaceConfig      `json:"workspace"`
+	Workspace     rawWorkspaceConfig     `json:"workspace"`
 }
 
 type rawWorkspaceConfig struct {
@@ -98,7 +100,7 @@ func LoadFrom(path string) (*Config, error) {
 	cfg := Default()
 
 	if path == "" {
-		home, err := os.UserHomeDir()
+		home, err := userhome.Dir()
 		if err != nil {
 			return cfg, nil // Return defaults on error
 		}
@@ -254,7 +256,7 @@ func mergeConfig(cfg *Config, raw *rawConfig) {
 // ExpandPath expands ~ to home directory.
 func ExpandPath(path string) string {
 	if strings.HasPrefix(path, "~/") {
-		home, err := os.UserHomeDir()
+		home, err := userhome.Dir()
 		if err != nil {
 			return path
 		}
@@ -268,7 +270,7 @@ func ConfigPath() string {
 	if testConfigPath != "" {
 		return testConfigPath
 	}
-	home, err := os.UserHomeDir()
+	home, err := userhome.Dir()
 	if err != nil {
 		return ""
 	}

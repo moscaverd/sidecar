@@ -2,13 +2,14 @@ package tdmonitor
 
 import (
 	"fmt"
-	"os/exec"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/marcus/td/pkg/monitor"
+
 	"github.com/marcus/sidecar/internal/app"
+	"github.com/marcus/sidecar/internal/hostexec"
 	"github.com/marcus/sidecar/internal/plugin"
 	"github.com/marcus/sidecar/internal/plugins/workspace"
 	"github.com/marcus/sidecar/internal/styles"
@@ -76,7 +77,7 @@ func (p *Plugin) Init(ctx *plugin.Context) error {
 	p.started = false
 
 	// Check if td binary is available on PATH
-	_, err := exec.LookPath("td")
+	_, err := hostexec.LookPath("td")
 	p.tdOnPath = err == nil
 
 	// Try to create embedded monitor with custom renderers for gradient borders.

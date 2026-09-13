@@ -16,6 +16,8 @@ import (
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/ansi"
+
+	"github.com/marcus/sidecar/internal/hostexec"
 	"github.com/marcus/sidecar/internal/msg"
 	"github.com/marcus/sidecar/internal/plugin"
 )
@@ -86,13 +88,13 @@ func (p *Plugin) revealInFileManager(path string) tea.Cmd {
 		switch runtime.GOOS {
 		case "darwin":
 			// macOS: open -R reveals in Finder with file selected
-			cmd = exec.Command("open", "-R", fullPath)
+			cmd = hostexec.Command("open", "-R", fullPath)
 		case "windows":
 			// Windows: explorer /select, reveals in Explorer with file selected
-			cmd = exec.Command("explorer", "/select,", fullPath)
+			cmd = hostexec.Command("explorer", "/select,", fullPath)
 		case "linux":
 			// Linux: xdg-open opens the parent directory
-			cmd = exec.Command("xdg-open", filepath.Dir(fullPath))
+			cmd = hostexec.Command("xdg-open", filepath.Dir(fullPath))
 		default:
 			return RevealErrorMsg{Err: fmt.Errorf("reveal not supported on %s", runtime.GOOS)}
 		}

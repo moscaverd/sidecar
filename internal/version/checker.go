@@ -2,11 +2,12 @@ package version
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/marcus/sidecar/internal/hostexec"
 )
 
 // UpdateAvailableMsg is sent when a new sidecar version is available.
@@ -131,7 +132,7 @@ func tdUpdateCommand(version string, method InstallMethod) string {
 // GetTdVersion returns the installed td version by running `td version --short`.
 // Returns empty string if td is not installed or command fails.
 func GetTdVersion() string {
-	out, err := exec.Command("td", "version", "--short").Output()
+	out, err := hostexec.Command("td", "version", "--short").Output()
 	if err != nil {
 		return ""
 	}

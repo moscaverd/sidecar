@@ -15,7 +15,10 @@ import (
 	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/marcus/sidecar/internal/features"
+	"github.com/marcus/sidecar/internal/hostexec"
+	"github.com/marcus/sidecar/internal/tmuxcmd"
 )
 
 // paneCacheEntry holds cached capture output with timestamp
@@ -235,9 +238,9 @@ const (
 
 	// Runaway detection thresholds (td-018f25)
 	// Detect sessions producing continuous output and throttle them to reduce CPU usage.
-	runawayPollCount    = 20               // Number of polls to track
-	runawayTimeWindow   = 3 * time.Second  // If 20 polls happen within this window = runaway
-	runawayResetCount   = 3                // Consecutive unchanged polls to reset throttle
+	runawayPollCount  = 20              // Number of polls to track
+	runawayTimeWindow = 3 * time.Second // If 20 polls happen within this window = runaway
+	runawayResetCount = 3               // Consecutive unchanged polls to reset throttle
 )
 
 // AgentStartedMsg signals an agent has been started in a worktree.
@@ -257,27 +260,27 @@ func (m AgentStartedMsg) GetEpoch() uint64 { return m.Epoch }
 // ApproveResultMsg signals the result of an approve action.
 type ApproveResultMsg struct {
 	WorkspaceName string
-	Err          error
+	Err           error
 }
 
 // RejectResultMsg signals the result of a reject action.
 type RejectResultMsg struct {
 	WorkspaceName string
-	Err          error
+	Err           error
 }
 
 // SendTextResultMsg signals the result of sending text to an agent.
 type SendTextResultMsg struct {
 	WorkspaceName string
-	Text         string
-	Err          error
+	Text          string
+	Err           error
 }
 
 // pollAgentMsg triggers output polling for a worktree's agent.
 // Includes generation for timer leak prevention (td-83dc22).
 type pollAgentMsg struct {
 	WorkspaceName string
-	Generation   int // Generation at time of scheduling; ignore if stale
+	Generation    int // Generation at time of scheduling; ignore if stale
 }
 
 // reconnectedAgentsMsg delivers reconnected agents from startup.
@@ -340,7 +343,7 @@ func (p *Plugin) StartAgent(wt *Worktree, agentType AgentType) tea.Cmd {
 		sessionName := tmuxSessionPrefix + sanitizeName(wt.Name)
 
 		// Check if session already exists
-		checkCmd := exec.Command("tmux", "has-session", "-t", sessionName)
+		checkCmd := tmuxcmd.Command("has-session", "-t", sessionName)
 		if checkCmd.Run() == nil {
 			// Session exists - reconnect to it instead of failing
 			paneID := getPaneID(sessionName)
@@ -362,29 +365,29 @@ func (p *Plugin) StartAgent(wt *Worktree, agentType AgentType) tea.Cmd {
 			"-c", wt.Path, // Working directory
 		}
 
-		cmd := exec.Command("tmux", args...)
+		cmd := tmuxcmd.Command(args...)
 		if err := cmd.Run(); err != nil {
 			return AgentStartedMsg{Epoch: epoch, Err: fmt.Errorf("create session: %w", err)}
 		}
 
 		// Set history limit for scrollback capture
-		_ = exec.Command("tmux", "set-option", "-t", sessionName, "history-limit",
+		_ = tmuxcmd.Command("set-option", "-t", sessionName, "history-limit",
 			strconv.Itoa(tmuxHistoryLimit)).Run()
 
 		// Set TD_SESSION_ID environment variable for td session tracking
 		envCmd := fmt.Sprintf("export TD_SESSION_ID=%s", shellQuote(sessionName))
-		_ = exec.Command("tmux", "send-keys", "-t", sessionName, envCmd, "Enter").Run()
+		_ = tmuxcmd.Command("send-keys", "-t", sessionName, envCmd, "Enter").Run()
 
 		// Apply environment isolation to prevent conflicts (GOWORK, etc.)
 		envOverrides := BuildEnvOverrides(p.ctx.WorkDir)
 		if envCmd := GenerateSingleEnvCommand(envOverrides); envCmd != "" {
-			_ = exec.Command("tmux", "send-keys", "-t", sessionName, envCmd, "Enter").Run()
+			_ = tmuxcmd.Command("send-keys", "-t", sessionName, envCmd, "Enter").Run()
 		}
 
 		// If worktree has a linked task, start it in td
 		if wt.TaskID != "" {
 			tdStartCmd := fmt.Sprintf("td start %s", wt.TaskID)
-			_ = exec.Command("tmux", "send-keys", "-t", sessionName, tdStartCmd, "Enter").Run()
+			_ = tmuxcmd.Command("send-keys", "-t", sessionName, tdStartCmd, "Enter").Run()
 		}
 
 		// Small delay to ensure env is set
@@ -394,10 +397,10 @@ func (p *Plugin) StartAgent(wt *Worktree, agentType AgentType) tea.Cmd {
 		agentCmd := p.getAgentCommandWithContext(agentType, wt)
 
 		// Send the agent command to start it
-		sendCmd := exec.Command("tmux", "send-keys", "-t", sessionName, agentCmd, "Enter")
+		sendCmd := tmuxcmd.Command("send-keys", "-t", sessionName, agentCmd, "Enter")
 		if err := sendCmd.Run(); err != nil {
 			// Try to kill the session if we failed to start the agent
-			_ = exec.Command("tmux", "kill-session", "-t", sessionName).Run()
+			_ = tmuxcmd.Command("kill-session", "-t", sessionName).Run()
 			return AgentStartedMsg{Epoch: epoch, Err: fmt.Errorf("start agent: %w", err)}
 		}
 
@@ -538,7 +541,7 @@ func (p *Plugin) StartAgentWithOptions(wt *Worktree, agentType AgentType, skipPe
 		sessionName := tmuxSessionPrefix + sanitizeName(wt.Name)
 
 		// Check if session already exists
-		checkCmd := exec.Command("tmux", "has-session", "-t", sessionName)
+		checkCmd := tmuxcmd.Command("has-session", "-t", sessionName)
 		if checkCmd.Run() == nil {
 			// Session exists - reconnect to it instead of failing
 			paneID := getPaneID(sessionName)
@@ -560,29 +563,29 @@ func (p *Plugin) StartAgentWithOptions(wt *Worktree, agentType AgentType, skipPe
 			"-c", wt.Path, // Working directory
 		}
 
-		cmd := exec.Command("tmux", args...)
+		cmd := tmuxcmd.Command(args...)
 		if err := cmd.Run(); err != nil {
 			return AgentStartedMsg{Epoch: epoch, Err: fmt.Errorf("create session: %w", err)}
 		}
 
 		// Set history limit for scrollback capture
-		_ = exec.Command("tmux", "set-option", "-t", sessionName, "history-limit",
+		_ = tmuxcmd.Command("set-option", "-t", sessionName, "history-limit",
 			strconv.Itoa(tmuxHistoryLimit)).Run()
 
 		// Set TD_SESSION_ID environment variable for td session tracking
 		tdEnvCmd := fmt.Sprintf("export TD_SESSION_ID=%s", shellQuote(sessionName))
-		_ = exec.Command("tmux", "send-keys", "-t", sessionName, tdEnvCmd, "Enter").Run()
+		_ = tmuxcmd.Command("send-keys", "-t", sessionName, tdEnvCmd, "Enter").Run()
 
 		// Apply environment isolation to prevent conflicts (GOWORK, etc.)
 		envOverrides := BuildEnvOverrides(p.ctx.WorkDir)
 		if envCmd := GenerateSingleEnvCommand(envOverrides); envCmd != "" {
-			_ = exec.Command("tmux", "send-keys", "-t", sessionName, envCmd, "Enter").Run()
+			_ = tmuxcmd.Command("send-keys", "-t", sessionName, envCmd, "Enter").Run()
 		}
 
 		// If worktree has a linked task, start it in td
 		if wt.TaskID != "" {
 			tdStartCmd := fmt.Sprintf("td start %s", wt.TaskID)
-			_ = exec.Command("tmux", "send-keys", "-t", sessionName, tdStartCmd, "Enter").Run()
+			_ = tmuxcmd.Command("send-keys", "-t", sessionName, tdStartCmd, "Enter").Run()
 		}
 
 		// Small delay to ensure env is set
@@ -592,10 +595,10 @@ func (p *Plugin) StartAgentWithOptions(wt *Worktree, agentType AgentType, skipPe
 		agentCmd := p.buildAgentCommand(agentType, wt, skipPerms, prompt)
 
 		// Send the agent command to start it
-		sendCmd := exec.Command("tmux", "send-keys", "-t", sessionName, agentCmd, "Enter")
+		sendCmd := tmuxcmd.Command("send-keys", "-t", sessionName, agentCmd, "Enter")
 		if err := sendCmd.Run(); err != nil {
 			// Try to kill the session if we failed to start the agent
-			_ = exec.Command("tmux", "kill-session", "-t", sessionName).Run()
+			_ = tmuxcmd.Command("kill-session", "-t", sessionName).Run()
 			return AgentStartedMsg{Epoch: epoch, Err: fmt.Errorf("start agent: %w", err)}
 		}
 
@@ -617,7 +620,7 @@ func (p *Plugin) AttachToWorktreeDir(wt *Worktree) tea.Cmd {
 	sessionName := tmuxSessionPrefix + sanitizeName(wt.Name)
 
 	// Check if session already exists
-	checkCmd := exec.Command("tmux", "has-session", "-t", sessionName)
+	checkCmd := tmuxcmd.Command("has-session", "-t", sessionName)
 	if checkCmd.Run() != nil {
 		// Session doesn't exist, create it
 		args := []string{
@@ -626,7 +629,7 @@ func (p *Plugin) AttachToWorktreeDir(wt *Worktree) tea.Cmd {
 			"-s", sessionName, // Session name
 			"-c", wt.Path, // Working directory
 		}
-		cmd := exec.Command("tmux", args...)
+		cmd := tmuxcmd.Command(args...)
 		if err := cmd.Run(); err != nil {
 			return func() tea.Msg {
 				return TmuxAttachFinishedMsg{WorkspaceName: wt.Name, Err: fmt.Errorf("create session: %w", err)}
@@ -651,7 +654,7 @@ func (p *Plugin) getTaskContext(taskID string) string {
 		workDir = p.ctx.WorkDir
 	}
 
-	cmd := exec.Command("td", "show", taskID, "--json")
+	cmd := hostexec.Command("td", "show", taskID, "--json")
 	cmd.Dir = workDir
 	output, err := cmd.Output()
 	if err != nil {
@@ -690,7 +693,7 @@ func getPaneID(sessionName string) string {
 		return paneID
 	}
 
-	cmd := exec.Command("tmux", "list-panes", "-t", sessionName, "-F", "#{pane_id}")
+	cmd := tmuxcmd.Command("list-panes", "-t", sessionName, "-F", "#{pane_id}")
 	output, err := cmd.Output()
 	if err != nil {
 		return ""
@@ -743,7 +746,7 @@ func (p *Plugin) scheduleInteractivePoll(worktreeName string, delay time.Duratio
 
 // AgentPollUnchangedMsg signals content unchanged, schedule next poll.
 type AgentPollUnchangedMsg struct {
-	WorkspaceName  string
+	WorkspaceName string
 	CurrentStatus WorktreeStatus // Status including session file re-check
 	WaitingFor    string         // Prompt text if waiting
 	// Cursor position captured atomically (even when content unchanged)
@@ -887,7 +890,7 @@ func (p *Plugin) handlePollAgent(worktreeName string) tea.Cmd {
 
 		if !outputChanged {
 			return AgentPollUnchangedMsg{
-				WorkspaceName:  worktreeName,
+				WorkspaceName: worktreeName,
 				CurrentStatus: status,
 				WaitingFor:    waitingFor,
 				CursorRow:     cursorRow,
@@ -900,7 +903,7 @@ func (p *Plugin) handlePollAgent(worktreeName string) tea.Cmd {
 		}
 
 		return AgentOutputMsg{
-			WorkspaceName:  worktreeName,
+			WorkspaceName: worktreeName,
 			Output:        output,
 			Status:        status,
 			WaitingFor:    waitingFor,
@@ -972,7 +975,7 @@ func capturePaneDirectWithJoin(sessionName string, joinWrapped bool) (string, er
 		args = append(args, "-J")
 	}
 	args = append(args, "-S", startLine, "-t", sessionName)
-	cmd := exec.CommandContext(ctx, "tmux", args...)
+	cmd := tmuxcmd.CommandContext(ctx, args...)
 	output, err := cmd.Output()
 	if ctx.Err() == context.DeadlineExceeded {
 		return "", fmt.Errorf("capture-pane: timeout after %s", tmuxCaptureTimeout)
@@ -1022,7 +1025,7 @@ done
 
 	ctx, cancel := context.WithTimeout(context.Background(), tmuxBatchCaptureTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "bash", "-c", script)
+	cmd := hostexec.CommandContext(ctx, "bash", "-c", script)
 	output, err := cmd.Output()
 	if ctx.Err() == context.DeadlineExceeded {
 		return nil, fmt.Errorf("batch capture: timeout after %s", tmuxBatchCaptureTimeout)
@@ -1245,12 +1248,12 @@ func (p *Plugin) Approve(wt *Worktree) tea.Cmd {
 		}
 
 		// Send "y" followed by Enter
-		cmd := exec.Command("tmux", "send-keys", "-t", wt.Agent.TmuxSession, "y", "Enter")
+		cmd := tmuxcmd.Command("send-keys", "-t", wt.Agent.TmuxSession, "y", "Enter")
 		err := cmd.Run()
 
 		return ApproveResultMsg{
 			WorkspaceName: wt.Name,
-			Err:          err,
+			Err:           err,
 		}
 	}
 }
@@ -1262,12 +1265,12 @@ func (p *Plugin) Reject(wt *Worktree) tea.Cmd {
 			return RejectResultMsg{WorkspaceName: wt.Name, Err: fmt.Errorf("no agent running")}
 		}
 
-		cmd := exec.Command("tmux", "send-keys", "-t", wt.Agent.TmuxSession, "n", "Enter")
+		cmd := tmuxcmd.Command("send-keys", "-t", wt.Agent.TmuxSession, "n", "Enter")
 		err := cmd.Run()
 
 		return RejectResultMsg{
 			WorkspaceName: wt.Name,
-			Err:          err,
+			Err:           err,
 		}
 	}
 }
@@ -1296,19 +1299,19 @@ func (p *Plugin) SendText(wt *Worktree, text string) tea.Cmd {
 		}
 
 		// Use -l to send literal text (no key name lookup)
-		cmd := exec.Command("tmux", "send-keys", "-l", "-t", wt.Agent.TmuxSession, text)
+		cmd := tmuxcmd.Command("send-keys", "-l", "-t", wt.Agent.TmuxSession, text)
 		if err := cmd.Run(); err != nil {
 			return SendTextResultMsg{Err: err}
 		}
 
 		// Send Enter separately
-		cmd = exec.Command("tmux", "send-keys", "-t", wt.Agent.TmuxSession, "Enter")
+		cmd = tmuxcmd.Command("send-keys", "-t", wt.Agent.TmuxSession, "Enter")
 		err := cmd.Run()
 
 		return SendTextResultMsg{
 			WorkspaceName: wt.Name,
-			Text:         text,
-			Err:          err,
+			Text:          text,
+			Err:           err,
 		}
 	}
 }
@@ -1341,7 +1344,7 @@ func (p *Plugin) StopAgent(wt *Worktree) tea.Cmd {
 		sessionName := wt.Agent.TmuxSession
 
 		// Try graceful interrupt first (Ctrl+C)
-		_ = exec.Command("tmux", "send-keys", "-t", sessionName, "C-c").Run()
+		_ = tmuxcmd.Command("send-keys", "-t", sessionName, "C-c").Run()
 
 		// Wait briefly for graceful shutdown
 		time.Sleep(2 * time.Second)
@@ -1349,7 +1352,7 @@ func (p *Plugin) StopAgent(wt *Worktree) tea.Cmd {
 		// Check if still running
 		if sessionExists(sessionName) {
 			// Force kill
-			_ = exec.Command("tmux", "kill-session", "-t", sessionName).Run()
+			_ = tmuxcmd.Command("kill-session", "-t", sessionName).Run()
 		}
 
 		return AgentStoppedMsg{WorkspaceName: wt.Name}
@@ -1358,7 +1361,7 @@ func (p *Plugin) StopAgent(wt *Worktree) tea.Cmd {
 
 // sessionExists checks if a tmux session exists.
 func sessionExists(name string) bool {
-	cmd := exec.Command("tmux", "has-session", "-t", name)
+	cmd := tmuxcmd.Command("has-session", "-t", name)
 	return cmd.Run() == nil
 }
 
@@ -1396,7 +1399,7 @@ func (p *Plugin) detectOrphanedWorktrees() {
 func (p *Plugin) reconnectAgents() tea.Cmd {
 	return func() tea.Msg {
 		// Find existing sidecar-ws-* tmux sessions
-		cmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}")
+		cmd := tmuxcmd.Command("list-sessions", "-F", "#{session_name}")
 		output, err := cmd.Output()
 		if err != nil {
 			// No tmux server running, that's fine
@@ -1457,7 +1460,7 @@ func (p *Plugin) Cleanup(removeSessions bool) error {
 		if removeSessions {
 			// Only kill sessions we created
 			if p.managedSessions[agent.TmuxSession] {
-				_ = exec.Command("tmux", "kill-session", "-t", agent.TmuxSession).Run()
+				_ = tmuxcmd.Command("kill-session", "-t", agent.TmuxSession).Run()
 				delete(p.managedSessions, agent.TmuxSession)
 				globalPaneCache.remove(agent.TmuxSession)
 				globalActiveRegistry.remove(agent.TmuxSession) // td-018f25
@@ -1470,7 +1473,7 @@ func (p *Plugin) Cleanup(removeSessions bool) error {
 
 // CleanupOrphanedSessions removes sessions that no longer have worktrees.
 func (p *Plugin) CleanupOrphanedSessions() error {
-	cmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}")
+	cmd := tmuxcmd.Command("list-sessions", "-F", "#{session_name}")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil // No tmux server
@@ -1491,7 +1494,7 @@ func (p *Plugin) CleanupOrphanedSessions() error {
 		// Use sanitized name lookup since session names are created with sanitizeName()
 		sanitizedName := strings.TrimPrefix(session, tmuxSessionPrefix)
 		if p.findWorktreeBySanitizedName(sanitizedName) == nil {
-			_ = exec.Command("tmux", "kill-session", "-t", session).Run()
+			_ = tmuxcmd.Command("kill-session", "-t", session).Run()
 			delete(p.managedSessions, session)
 			globalPaneCache.remove(session)
 			globalActiveRegistry.remove(session) // td-018f25
@@ -1507,7 +1510,7 @@ func (p *Plugin) validateManagedSessions() tea.Cmd {
 		existing := make(map[string]bool)
 
 		// List all tmux sessions
-		cmd := exec.Command("tmux", "list-sessions", "-F", "#{session_name}")
+		cmd := tmuxcmd.Command("list-sessions", "-F", "#{session_name}")
 		output, err := cmd.Output()
 		if err != nil {
 			// No tmux server, all sessions are gone

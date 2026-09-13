@@ -16,6 +16,7 @@ import (
 	"github.com/marcus/sidecar/internal/adapter"
 	"github.com/marcus/sidecar/internal/adapter/cache"
 	"github.com/marcus/sidecar/internal/adapter/pricing"
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 // xmlTagRegex matches XML/HTML-like tags for stripping from session titles
@@ -49,7 +50,7 @@ type messageCacheEntry struct {
 
 // New creates a new Claude Code adapter.
 func New() *Adapter {
-	home, _ := os.UserHomeDir()
+	home, _ := userhome.Dir()
 	projectsDir := findClaudeCodeProjectsDir(home)
 	return &Adapter{
 		projectsDir:  projectsDir,

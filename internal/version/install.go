@@ -2,11 +2,13 @@ package version
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/marcus/sidecar/internal/hostexec"
+	"github.com/marcus/sidecar/internal/userhome"
 )
 
 // InstallMethod represents how sidecar was installed.
@@ -52,11 +54,11 @@ func isHomebrewInstall() bool {
 	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
 		return false
 	}
-	_, err := exec.LookPath("brew")
+	_, err := hostexec.LookPath("brew")
 	if err != nil {
 		return false
 	}
-	out, err := exec.Command("brew", "list", "--formula", "marcus/tap/sidecar").CombinedOutput()
+	out, err := hostexec.Command("brew", "list", "--formula", "marcus/tap/sidecar").CombinedOutput()
 	if err != nil {
 		return false
 	}
@@ -91,7 +93,7 @@ func isGoInstall() bool {
 	}
 
 	// Check default ~/go/bin
-	if home, err := os.UserHomeDir(); err == nil {
+	if home, err := userhome.Dir(); err == nil {
 		if dir == filepath.Join(home, "go", "bin") {
 			return true
 		}

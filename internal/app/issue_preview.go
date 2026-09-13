@@ -9,6 +9,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/marcus/sidecar/internal/hostexec"
 )
 
 // IssueSearchResult holds a single search result from td search.
@@ -45,7 +47,7 @@ func issueSearchCmd(workDir, query string, includeClosed bool) tea.Cmd {
 		if !includeClosed {
 			args = append(args, "-s", "open", "-s", "in_progress", "-s", "blocked", "-s", "in_review")
 		}
-		cmd := exec.Command("td", args...)
+		cmd := hostexec.Command("td", args...)
 		cmd.Dir = workDir
 		out, err := cmd.Output()
 		if err != nil {
@@ -100,7 +102,7 @@ type OpenFullIssueMsg struct {
 // workDir sets the command's working directory so td uses the correct project database.
 func fetchIssuePreviewCmd(workDir, issueID string) tea.Cmd {
 	return func() tea.Msg {
-		cmd := exec.Command("td", "show", issueID, "-f", "json")
+		cmd := hostexec.Command("td", "show", issueID, "-f", "json")
 		cmd.Dir = workDir
 		out, err := cmd.Output()
 		if err != nil {

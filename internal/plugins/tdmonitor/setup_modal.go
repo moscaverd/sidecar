@@ -2,7 +2,6 @@ package tdmonitor
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -10,6 +9,8 @@ import (
 	"github.com/marcus/td/pkg/monitor"
 	"github.com/marcus/td/pkg/monitor/modal"
 	"github.com/marcus/td/pkg/monitor/mouse"
+
+	"github.com/marcus/sidecar/internal/hostexec"
 )
 
 // SetupModel handles the setup modal when td is on PATH but not initialized in project.
@@ -112,7 +113,7 @@ func (m *SetupModel) performSetup() tea.Cmd {
 	return func() tea.Msg {
 		if m.initDB {
 			// Call td init via exec
-			cmd := exec.Command("td", "init")
+			cmd := hostexec.Command("td", "init")
 			cmd.Dir = m.baseDir
 			if err := cmd.Run(); err != nil {
 				// Return nil on error - could add error display
