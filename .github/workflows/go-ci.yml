@@ -28,6 +28,11 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: ['1.26.8', '1.27.1']
+    env:
+      GOTOOLCHAIN: local
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,7 +40,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: ${{ matrix.go }}
 
       - name: Test
         run: go test ./...
@@ -56,5 +61,5 @@ jobs:
       - name: golangci-lint (full codebase)
         uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.8.0
+          version: v2.13.1
           args: ./...

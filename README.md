@@ -33,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/marcus/sidecar/main/scripts/setup.s
 ## Requirements
 
 - macOS, Linux, or WSL
-- Go 1.21+ (only if building from source)
+- Go 1.26+ (only if building from source)
 
 ## Quick Start
 
