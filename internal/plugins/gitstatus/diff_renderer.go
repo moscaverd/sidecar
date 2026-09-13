@@ -12,7 +12,7 @@ import (
 type DiffViewMode int
 
 const (
-	DiffViewUnified   DiffViewMode = iota // Line-by-line unified view
+	DiffViewUnified    DiffViewMode = iota // Line-by-line unified view
 	DiffViewSideBySide                     // Side-by-side split view
 )
 
@@ -298,13 +298,13 @@ func RenderSideBySide(diff *ParsedDiff, width, startLine, maxLines, horizontalOf
 					lLine = padToWidth(lLine, contentWidth)
 					rLine = padToWidth(rLine, contentWidth)
 					if vi == 0 {
-						sb.WriteString(fmt.Sprintf("%s │%s", lineNoStyle.Render(leftLineNo), lLine))
+						fmt.Fprintf(&sb, "%s │%s", lineNoStyle.Render(leftLineNo), lLine)
 						sb.WriteString(sep)
-						sb.WriteString(fmt.Sprintf("%s │%s", lineNoStyle.Render(rightLineNo), rLine))
+						fmt.Fprintf(&sb, "%s │%s", lineNoStyle.Render(rightLineNo), rLine)
 					} else {
-						sb.WriteString(fmt.Sprintf("%s │%s", lineNoPad, lLine))
+						fmt.Fprintf(&sb, "%s │%s", lineNoPad, lLine)
 						sb.WriteString(sep)
-						sb.WriteString(fmt.Sprintf("%s │%s", lineNoPad, rLine))
+						fmt.Fprintf(&sb, "%s │%s", lineNoPad, rLine)
 					}
 					sb.WriteString("\n")
 					rendered++

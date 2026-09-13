@@ -239,9 +239,9 @@ func (p *Plugin) deleteConfirmInfoSection() modal.Section {
 
 		wt := p.deleteConfirmWorktree
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Name:   %s\n", lipgloss.NewStyle().Bold(true).Render(wt.Name)))
-		sb.WriteString(fmt.Sprintf("Branch: %s\n", wt.Branch))
-		sb.WriteString(fmt.Sprintf("Path:   %s", dimText(wt.Path)))
+		fmt.Fprintf(&sb, "Name:   %s\n", lipgloss.NewStyle().Bold(true).Render(wt.Name))
+		fmt.Fprintf(&sb, "Branch: %s\n", wt.Branch)
+		fmt.Fprintf(&sb, "Path:   %s", dimText(wt.Path))
 
 		return modal.RenderedSection{Content: sb.String()}
 	}, nil)
@@ -303,10 +303,10 @@ const (
 )
 
 const (
-	commitForMergeInputID   = "commit-for-merge-input"
-	commitForMergeCommitID  = "commit-for-merge-commit"
-	commitForMergeCancelID  = "commit-for-merge-cancel"
-	commitForMergeActionID  = "commit-for-merge-action"
+	commitForMergeInputID  = "commit-for-merge-input"
+	commitForMergeCommitID = "commit-for-merge-commit"
+	commitForMergeCancelID = "commit-for-merge-cancel"
+	commitForMergeActionID = "commit-for-merge-action"
 )
 
 // renderConfirmDeleteShellModal renders the shell delete confirmation modal.
@@ -365,8 +365,8 @@ func (p *Plugin) deleteShellInfoSection() modal.Section {
 		shell := p.deleteConfirmShell
 
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Name:    %s\n", lipgloss.NewStyle().Bold(true).Render(shell.Name)))
-		sb.WriteString(fmt.Sprintf("Session: %s", dimText(shell.TmuxName)))
+		fmt.Fprintf(&sb, "Name:    %s\n", lipgloss.NewStyle().Bold(true).Render(shell.Name))
+		fmt.Fprintf(&sb, "Session: %s", dimText(shell.TmuxName))
 
 		return modal.RenderedSection{Content: sb.String()}
 	}, nil)
@@ -439,8 +439,8 @@ func (p *Plugin) renameShellInfoSection() modal.Section {
 
 		shell := p.renameShellSession
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Session: %s\n", dimText(shell.TmuxName)))
-		sb.WriteString(fmt.Sprintf("Current: %s", lipgloss.NewStyle().Bold(true).Render(shell.Name)))
+		fmt.Fprintf(&sb, "Session: %s\n", dimText(shell.TmuxName))
+		fmt.Fprintf(&sb, "Current: %s", lipgloss.NewStyle().Bold(true).Render(shell.Name))
 
 		return modal.RenderedSection{Content: sb.String()}
 	}, nil)
@@ -669,9 +669,9 @@ func (p *Plugin) ensureMergeModal() {
 		m.AddSection(modal.Text(dimText("Select what to clean up:")))
 		m.AddSection(modal.Spacer())
 		m.AddSection(modal.Checkbox(mergeConfirmWorktreeID, "Delete local worktree", &p.mergeState.DeleteLocalWorktree))
-		m.AddSection(modal.Text(dimText("  Removes "+p.mergeState.Worktree.Path)))
+		m.AddSection(modal.Text(dimText("  Removes " + p.mergeState.Worktree.Path)))
 		m.AddSection(modal.Checkbox(mergeConfirmBranchID, "Delete local branch", &p.mergeState.DeleteLocalBranch))
-		m.AddSection(modal.Text(dimText("  Removes '"+p.mergeState.Worktree.Branch+"' locally")))
+		m.AddSection(modal.Text(dimText("  Removes '" + p.mergeState.Worktree.Branch + "' locally")))
 		m.AddSection(modal.Checkbox(mergeConfirmRemoteID, "Delete remote branch", &p.mergeState.DeleteRemoteBranch))
 		m.AddSection(modal.Text(dimText("  Removes from GitHub (often auto-deleted)")))
 		m.AddSection(modal.Spacer())
@@ -865,7 +865,7 @@ func (p *Plugin) mergeWaitingSection() modal.Section {
 		sb.WriteString("\n\n")
 
 		if p.mergeState.PRURL != "" {
-			sb.WriteString(fmt.Sprintf("URL: %s", p.mergeState.PRURL))
+			fmt.Fprintf(&sb, "URL: %s", p.mergeState.PRURL)
 			sb.WriteString("\n")
 		}
 
@@ -1094,8 +1094,8 @@ func (p *Plugin) commitForMergeInfoSection() modal.Section {
 
 		wt := p.mergeCommitState.Worktree
 		var sb strings.Builder
-		sb.WriteString(fmt.Sprintf("Workspace: %s\n", lipgloss.NewStyle().Bold(true).Render(wt.Name)))
-		sb.WriteString(fmt.Sprintf("Branch:    %s", wt.Branch))
+		fmt.Fprintf(&sb, "Workspace: %s\n", lipgloss.NewStyle().Bold(true).Render(wt.Name))
+		fmt.Fprintf(&sb, "Branch:    %s", wt.Branch)
 
 		return modal.RenderedSection{Content: sb.String()}
 	}, nil)
@@ -1111,13 +1111,13 @@ func (p *Plugin) commitForMergeChangesSection() modal.Section {
 		var sb strings.Builder
 		sb.WriteString(lipgloss.NewStyle().Bold(true).Render("Changes to commit:"))
 		if p.mergeCommitState.StagedCount > 0 {
-			sb.WriteString(fmt.Sprintf("\n  • %d staged file(s)", p.mergeCommitState.StagedCount))
+			fmt.Fprintf(&sb, "\n  • %d staged file(s)", p.mergeCommitState.StagedCount)
 		}
 		if p.mergeCommitState.ModifiedCount > 0 {
-			sb.WriteString(fmt.Sprintf("\n  • %d modified file(s)", p.mergeCommitState.ModifiedCount))
+			fmt.Fprintf(&sb, "\n  • %d modified file(s)", p.mergeCommitState.ModifiedCount)
 		}
 		if p.mergeCommitState.UntrackedCount > 0 {
-			sb.WriteString(fmt.Sprintf("\n  • %d untracked file(s)", p.mergeCommitState.UntrackedCount))
+			fmt.Fprintf(&sb, "\n  • %d untracked file(s)", p.mergeCommitState.UntrackedCount)
 		}
 
 		return modal.RenderedSection{Content: sb.String()}
