@@ -41,13 +41,21 @@ func TestDefaultPersistenceUsesOnlyFixtureProfile(t *testing.T) {
 	if err := state.SetGitDiffMode("side-by-side"); err != nil {
 		t.Fatal(err)
 	}
-	entry := &version.CacheEntry{LatestVersion: "v2.0.0", CurrentVersion: "v1.0.0", CheckedAt: time.Now().Truncate(time.Second), HasUpdate: true}
-	if err := version.SaveCache(entry); err != nil {
-		t.Fatal(err)
-	}
-	cached, err := version.LoadCache()
-	if err != nil || *cached != *entry {
-		t.Fatalf("fixture version cache round trip failed: %v", err)
+	for _, zone := range []*time.Location{time.FixedZone("fixture UTC", 0), time.FixedZone("fixture offset", -7*60*60)} {
+		t.Run(zone.String(), func(t *testing.T) {
+			entry := &version.CacheEntry{LatestVersion: "v2.0.0", CurrentVersion: "v1.0.0", CheckedAt: time.Date(2026, time.September, 12, 20, 0, 0, 123456789, zone), HasUpdate: true}
+			if err := version.SaveCache(entry); err != nil {
+				t.Fatal(err)
+			}
+			cached, err := version.LoadCache()
+			if err != nil || cached == nil {
+				t.Fatalf("fixture version cache round trip failed: %v", err)
+			}
+			// JSON preserves the instant and offset, not time.Location identity.
+			if cached.LatestVersion != entry.LatestVersion || cached.CurrentVersion != entry.CurrentVersion || cached.HasUpdate != entry.HasUpdate || !cached.CheckedAt.Equal(entry.CheckedAt) {
+				t.Fatalf("fixture version cache round trip changed values: got %+v, want %+v", cached, entry)
+			}
+		})
 	}
 	for _, name := range []string{"config.json", "state.json", "version_cache.json"} {
 		info, err := os.Stat(filepath.Join(expected, name))

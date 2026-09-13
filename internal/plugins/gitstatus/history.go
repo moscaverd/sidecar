@@ -199,7 +199,8 @@ func GetCommitDiff(workDir, hash, path string, parentHash string) (string, error
 	if parentHash != "" {
 		args = []string{"diff", parentHash, hash, "--", path}
 	} else {
-		args = []string{"show", hash, "--", path}
+		// File diffs must not include commit metadata, even at a shallow boundary.
+		args = []string{"show", "--format=", hash, "--", path}
 	}
 
 	cmd := exec.Command("git", args...)
