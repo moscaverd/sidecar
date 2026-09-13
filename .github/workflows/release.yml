@@ -6,10 +6,13 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   goreleaser:
+    if: github.repository == 'marcus/sidecar'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,6 +35,9 @@ jobs:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
   update-homebrew-tap:
+    if: github.repository == 'marcus/sidecar'
+    permissions:
+      contents: write
     needs: goreleaser
     runs-on: ubuntu-latest
     steps:

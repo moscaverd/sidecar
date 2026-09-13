@@ -8,6 +8,9 @@ on:
       - 'website/**'
       - '.github/workflows/test-docs.yml'
 
+permissions:
+  contents: read
+
 jobs:
   test-build:
     runs-on: ubuntu-latest
